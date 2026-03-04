@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:custom_advanced_sms/custom_advanced_sms.dart';
+import 'package:flutter/services.dart';
+import 'package:telephony/telephony.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'message_detail_screen.dart';
@@ -15,8 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final SmsQuery _query = SmsQuery();
-  final SmsReceiver _receiver = SmsReceiver();
+  final Telephony _telephony = Telephony.instance;
   List<SmsMessage> personal = [], business = [], suspicious = [];
 
   @override
@@ -24,17 +24,26 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadSms();
-    _receiver.onSmsReceived!.listen(_handleNewSms);
+    _telephony.listenIncomingSms(
+      onNewMessage: (SmsMessage msg) async {
+        await _handleNewSms(msg);
+      },
+      listenInBackground: false,
+    );
   }
 
   Future<void> _loadSms() async {
-    final messages = await _query.querySms(
-      kinds: [SmsQueryKind.Inbox],
-    );
-    for (var msg in messages) {
-      await _categorizeSms(msg);
+    try {
+      final messages = await _telephony.getInboxSms(
+        columns: [SmsColumn.ADDRESS, SmsColumn.BODY, SmsColumn.DATE],
+      );
+      for (var msg in messages) {
+        await _categorizeSms(msg);
+      }
+      setState(() {});
+    } on PlatformException catch (e) {
+      debugPrint('Failed to load SMS: $e');
     }
-    setState(() {});
   }
 
   Future<void> _handleNewSms(SmsMessage msg) async {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:custom_advanced_sms/custom_advanced_sms.dart';
+import 'package:telephony/telephony.dart';
 
 class MessageDetailScreen extends StatefulWidget {
   final SmsMessage message;
