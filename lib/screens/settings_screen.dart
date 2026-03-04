@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telephony/telephony.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -38,7 +37,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _reSync() async {
-    // Re-load and re-categorize SMS; call your home logic
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Re-syncing...')));
@@ -48,9 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const AndroidInitializationSettings initSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     await notifications.initialize(
-      const InitializationSettings(android: initSettingsAndroid),
+      settings: const InitializationSettings(android: initSettingsAndroid),
     );
-    // Schedule daily summary, e.g., via flutter_local_notifications
   }
 
   @override

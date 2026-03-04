@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:telephony/telephony.dart';
+import 'package:sms_advanced/sms_advanced.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'message_detail_screen.dart';
@@ -15,7 +15,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final Telephony telephony = Telephony.instance;
+  final SmsQuery _query = SmsQuery();
+  final SmsReceiver _receiver = SmsReceiver();
   List<SmsMessage> personal = [], business = [], suspicious = [];
 
   @override
@@ -23,22 +24,21 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadSms();
-    telephony.listenIncomingSms(
-      onNewMessage: _handleNewSms,
-      listenInBackground: false,
-    );
+    _receiver.onSmsReceived!.listen(_handleNewSms);
   }
 
   Future<void> _loadSms() async {
-    final messages = await telephony.getInboxSms();
+    final messages = await _query.querySms(
+      kinds: [SmsQueryKind.Inbox],
+    );
     for (var msg in messages) {
-      _categorizeSms(msg);
+      await _categorizeSms(msg);
     }
     setState(() {});
   }
 
   Future<void> _handleNewSms(SmsMessage msg) async {
-    _categorizeSms(msg);
+    await _categorizeSms(msg);
     setState(() {});
   }
 
@@ -52,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['confidence'] > 50) {
-        // Threshold; adjust based on your model
         suspicious.add(msg);
       } else if (_isBusiness(msg)) {
         business.add(msg);
@@ -63,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   bool _isBusiness(SmsMessage msg) {
-    // Simple heuristic; enhance with local logic or API
     return msg.address?.contains('BANK') ??
         false || (msg.body?.toLowerCase().contains('offer') ?? false);
   }
