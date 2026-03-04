@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sms_advanced/sms_advanced.dart';
+import 'package:custom_advanced_sms/custom_advanced_sms.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'message_detail_screen.dart';
