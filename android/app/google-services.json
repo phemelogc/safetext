@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "924336702176",
+    "project_id": "safetext-31566",
+    "storage_bucket": "safetext-31566.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:924336702176:android:4bcec8dd8d6792cb4e0685",
+        "android_client_info": {
+          "package_name": "com.example.safetext"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-rN86-u4RZq0FnHSEwX3TisGGBZkpYRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
