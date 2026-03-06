@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'screens/onboarding_screen.dart'; // Import your screens
+import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/message_detail_screen.dart';
-import 'screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   final prefs = await SharedPreferences.getInstance();
   final bool onboarded = prefs.getBool('onboarded') ?? false;
   runApp(
