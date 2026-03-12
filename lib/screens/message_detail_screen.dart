@@ -15,10 +15,13 @@ class MessageDetailScreen extends StatefulWidget {
   State<MessageDetailScreen> createState() => _MessageDetailScreenState();
 }
 
-class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTickerProviderStateMixin {
+class _MessageDetailScreenState extends State<MessageDetailScreen>
+    with SingleTickerProviderStateMixin {
   String _prediction = '';
   bool _isLoading = true;
   double? _confidence;
+  bool _flagged = false;
+  String _loadingMessage = '';
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
 
@@ -29,9 +32,22 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
-    
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeIn,
+    );
+
     _getPrediction();
+
+    // Show "waking server" message if still loading after 8 seconds
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _isLoading) {
+        final lang = SafeTextApp.localeNotifier.value;
+        setState(() {
+          _loadingMessage = Translations.get('waking_server', lang);
+        });
+      }
+    });
   }
 
   @override
@@ -42,20 +58,40 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
 
   Future<void> _getPrediction() async {
     final lang = SafeTextApp.localeNotifier.value;
+
+    final messageBody = widget.message.body ?? '';
+    if (messageBody.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _prediction = Translations.get('error', lang);
+          _isLoading = false;
+        });
+        _animController.forward();
+      }
+      return;
+    }
+
     try {
       final url = Uri.parse(predictUrl);
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'message': widget.message.body ?? ''}),
-      );
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'message': messageBody}),
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () =>
+                http.Response(jsonEncode({'error': 'timeout'}), 408),
+          );
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _confidence = (data['confidence'] as num?)?.toDouble();
-        
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (mounted) {
           setState(() {
-            _prediction = data['explanation'] ?? '';
+            _confidence = (data['confidence'] as num?)?.toDouble();
+            _flagged = data['flagged'] as bool? ?? false;
+            _prediction = data['explanation'] as String? ?? '';
             _isLoading = false;
           });
           _animController.forward();
@@ -63,7 +99,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
       } else {
         if (mounted) {
           setState(() {
-            _prediction = Translations.get('error', lang);
+            _prediction = response.statusCode == 408
+                ? Translations.get('timeout_error', lang)
+                : Translations.get('error', lang);
             _isLoading = false;
           });
           _animController.forward();
@@ -95,16 +133,18 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-             content: Text(Translations.get('feedback_sent', lang)),
-             behavior: SnackBarBehavior.floating,
-             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-           ),
+          SnackBar(
+            content: Text(Translations.get('feedback_sent', lang)),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         );
         if (isReport) {
-           await _blockContact();
+          await _blockContact();
         } else {
-           Navigator.pop(context, false);
+          Navigator.pop(context, false);
         }
       }
     } catch (_) {
@@ -126,9 +166,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
       await prefs.setStringList('blockList', blockList);
     }
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$addr blocked')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$addr blocked')));
       Navigator.pop(context, true);
     }
   }
@@ -136,13 +176,16 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final lang = SafeTextApp.localeNotifier.value;
-    final isScam = _confidence != null && _confidence! > 0.6;
+    final isScam = _flagged;
     final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.message.address ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          widget.message.address ?? 'Unknown',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
@@ -155,6 +198,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Message body card
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -165,22 +209,33 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                             color: Colors.black.withOpacity(0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ],
                       ),
                       child: Text(
                         widget.message.body ?? '',
-                        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 18, height: 1.5),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 18,
+                          height: 1.5,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 32),
+
+                    // Loading or result
                     if (_isLoading)
                       Center(
                         child: Column(
                           children: [
                             const CircularProgressIndicator(),
                             const SizedBox(height: 16),
-                            Text(Translations.get('analyzing', lang), style: const TextStyle(color: Colors.grey)),
+                            Text(
+                              _loadingMessage.isEmpty
+                                  ? Translations.get('analyzing', lang)
+                                  : _loadingMessage,
+                              style: const TextStyle(color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       )
@@ -190,10 +245,14 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                         child: Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: isScam ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                            color: isScam
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: isScam ? Colors.redAccent.withOpacity(0.5) : Colors.green.withOpacity(0.5),
+                              color: isScam
+                                  ? Colors.redAccent.withOpacity(0.5)
+                                  : Colors.green.withOpacity(0.5),
                               width: 2,
                             ),
                           ),
@@ -203,18 +262,25 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                               Row(
                                 children: [
                                   Icon(
-                                    isScam ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                                    color: isScam ? Colors.redAccent : Colors.green,
+                                    isScam
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.check_circle_outline,
+                                    color: isScam
+                                        ? Colors.redAccent
+                                        : Colors.green,
                                     size: 28,
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      '${Translations.get('suspicion', lang)}: ${(_confidence! * 100).round()}%',
+                                      '${Translations.get('suspicion', lang)}: '
+                                      '${_confidence != null ? '${(_confidence! * 100).round()}%' : '-'}',
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: isScam ? Colors.redAccent : Colors.green,
+                                        color: isScam
+                                            ? Colors.redAccent
+                                            : Colors.green,
                                       ),
                                     ),
                                   ),
@@ -237,11 +303,16 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                 ),
               ),
             ),
+
+            // Action buttons
             if (!_isLoading)
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.cardColor,
                     boxShadow: [
@@ -249,7 +320,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                         color: Colors.black.withOpacity(0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -4),
-                      )
+                      ),
                     ],
                   ),
                   child: Row(
@@ -262,7 +333,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey.shade600,
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                         ),
                       ),
@@ -275,7 +348,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> with SingleTi
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                         ),
                       ),

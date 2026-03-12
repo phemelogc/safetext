@@ -1,5 +1,5 @@
 /// Base URL for the SafeText backend. Change for localhost or another host.
-const String apiBaseUrl = 'https://safetextbackend.onrender.com';
+const String apiBaseUrl = 'http://192.168.1.153:8000';
 
 String get predictUrl => '$apiBaseUrl/predict';
 String get feedbackUrl => '$apiBaseUrl/feedback';
