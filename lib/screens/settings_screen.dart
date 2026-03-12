@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../utils/translations.dart';
+import '../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onReSync;
@@ -15,6 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final FlutterLocalNotificationsPlugin notifications =
       FlutterLocalNotificationsPlugin();
   List<String> blockList = [], allowList = [];
+  bool _dailySummary = false;
 
   @override
   void initState() {
@@ -27,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       blockList = prefs.getStringList('blockList') ?? [];
       allowList = prefs.getStringList('allowList') ?? [];
+      _dailySummary = prefs.getBool('dailySummary') ?? false;
     });
   }
 
@@ -55,33 +59,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _toggleDailySummary(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('dailySummary', value);
+    setState(() => _dailySummary = value);
+    if (value) {
+      await _setupNotifications();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Daily summary enabled')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lang = SafeTextApp.localeNotifier.value;
+    final isDark = SafeTextApp.themeNotifier.value == ThemeMode.dark;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(Translations.get('settings', lang))),
       body: ListView(
         children: [
           ListTile(
-            title: const Text('Block List'),
+            title: Text(Translations.get('block_list', lang)),
             trailing: Text('${blockList.length}'),
             onTap: () => _showListDialog(true),
           ),
           ListTile(
-            title: const Text('Allow List'),
+            title: Text(Translations.get('allow_list', lang)),
             trailing: Text('${allowList.length}'),
             onTap: () => _showListDialog(false),
           ),
-          ListTile(title: const Text('Re-Sync Inbox'), onTap: _reSync),
           ListTile(
-            title: const Text('Daily Summary Notifications'),
-            trailing: Switch(
-              value: true,
-              onChanged: (_) => _setupNotifications(),
-            ),
+            title: Text(Translations.get('resync_inbox', lang)),
+            onTap: _reSync,
+            trailing: const Icon(Icons.sync),
+          ),
+          const Divider(),
+          SwitchListTile(
+            title: Text(Translations.get('daily_summary', lang)),
+            value: _dailySummary,
+            onChanged: _toggleDailySummary,
+            secondary: const Icon(Icons.notifications_active),
+          ),
+          SwitchListTile(
+            title: Text(Translations.get('theme', lang)),
+            subtitle: Text(isDark ? 'Dark Mode' : 'Light Mode'),
+            value: isDark,
+            onChanged: (val) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isDark', val);
+              SafeTextApp.themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+            },
+            secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
           ),
           ListTile(
-            title: const Text('Theme'),
-            subtitle: const Text('System Default'),
+            title: Text(Translations.get('language', lang)),
+            subtitle: Text(lang == 'en' ? 'English' : 'Setswana'),
+            leading: const Icon(Icons.language),
+            trailing: DropdownButton<String>(
+              value: lang,
+              underline: const SizedBox(),
+              items: const [
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'tn', child: Text('Setswana')),
+              ],
+              onChanged: (newLang) async {
+                if (newLang != null) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('lang', newLang);
+                  SafeTextApp.localeNotifier.value = newLang;
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -89,10 +140,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showListDialog(bool isBlock) {
+    final lang = SafeTextApp.localeNotifier.value;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isBlock ? 'Block List' : 'Allow List'),
+        title: Text(isBlock ? Translations.get('block_list', lang) : Translations.get('allow_list', lang)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -102,14 +154,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 8),
               TextButton.icon(
                 icon: const Icon(Icons.add),
-                label: Text(isBlock ? 'Add number to block' : 'Add to allow list'),
+                label: Text('Add'),
                 onPressed: () async {
                   Navigator.pop(context);
                   final controller = TextEditingController();
                   final added = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: Text(isBlock ? 'Block number' : 'Allow number'),
+                      title: const Text('Add number'),
                       content: TextField(
                         controller: controller,
                         decoration: const InputDecoration(
@@ -131,7 +183,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   if (added == true && controller.text.trim().isNotEmpty) {
                     await _addToList(controller.text.trim(), isBlock);
-                    if (mounted) setState(() {});
                   }
                 },
               ),

@@ -10,6 +10,9 @@ import '../config/api.dart';
 import '../services/notification_service.dart';
 import 'message_detail_screen.dart';
 import 'settings_screen.dart';
+import 'education_hub_screen.dart';
+import '../utils/translations.dart';
+import '../main.dart';
 
 @pragma('vm:entry-point')
 Future<void> onBackgroundMessage(SmsMessage msg) async {
@@ -191,10 +194,20 @@ class _HomeScreenState extends State<HomeScreen> {
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            title: const Text('SafeText', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(Translations.get('app_title', SafeTextApp.localeNotifier.value), style: const TextStyle(fontWeight: FontWeight.bold)),
             floating: true,
             snap: true,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.school_outlined),
+                tooltip: Translations.get('education_hub', SafeTextApp.localeNotifier.value),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EducationHubScreen()),
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.settings),
                 onPressed: () async {
@@ -227,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search messages',
+                        hintText: Translations.get('search_messages', SafeTextApp.localeNotifier.value),
                         hintStyle: TextStyle(color: Colors.grey.shade400),
                         prefixIcon: const Icon(Icons.search, color: Colors.grey),
                         filled: true,
