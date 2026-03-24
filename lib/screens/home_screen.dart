@@ -13,7 +13,7 @@ import 'settings_screen.dart';
 import 'education_hub_screen.dart';
 import '../utils/translations.dart';
 import '../main.dart';
-
+import '../firebase/firestore_service.dart';
 @pragma('vm:entry-point')
 Future<void> onBackgroundMessage(SmsMessage msg) async {
   debugPrint('Received background message: ${msg.body}');
@@ -31,19 +31,33 @@ Future<void> onBackgroundMessage(SmsMessage msg) async {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'message': msg.body ?? ''}),
     );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final confidence = (data['confidence'] as num?)?.toDouble();
-      if (confidence != null && confidence >= 0.8) {
-        await NotificationService.showSuspiciousAlert(
-          from: addr,
-          bodySnippet: (msg.body ?? '').length > 60
-              ? '${(msg.body ?? '').substring(0, 60)}...'
-              : (msg.body ?? ''),
-        );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final confidence = (data['confidence'] as num?)?.toDouble();
+        
+        try { await FirestoreService().logEvent('message_scanned', 'Background message scanned'); } catch (_) {}
+
+        if (confidence != null && confidence >= 0.8) {
+          try {
+            await FirestoreService().writeFlaggedMessage(
+              messageText: msg.body ?? '',
+              senderNumber: addr,
+              confidenceScore: confidence,
+              patternTags: ['background_scan'],
+            );
+          } catch (_) {}
+
+          await NotificationService.showSuspiciousAlert(
+            from: addr,
+            bodySnippet: (msg.body ?? '').length > 60
+                ? '${(msg.body ?? '').substring(0, 60)}...'
+                : (msg.body ?? ''),
+          );
+
+          try { await FirestoreService().logEvent('alert_shown', 'Suspicious alert shown (background)'); } catch (_) {}
+        }
       }
-    }
-  } catch (e) {
+    } catch (e) {
     debugPrint('Background Predict failed: $e');
   }
 }
@@ -141,13 +155,27 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final confidence = (data['confidence'] as num?)?.toDouble();
+
+        try { await FirestoreService().logEvent('message_scanned', 'Foreground message scanned'); } catch (_) {}
+
         if (confidence != null && confidence >= 0.8) {
+          try {
+            await FirestoreService().writeFlaggedMessage(
+              messageText: msg.body ?? '',
+              senderNumber: addr,
+              confidenceScore: confidence,
+              patternTags: ['foreground_scan'],
+            );
+          } catch (_) {}
+
           await NotificationService.showSuspiciousAlert(
             from: addr,
             bodySnippet: (msg.body ?? '').length > 60
                 ? '${(msg.body ?? '').substring(0, 60)}...'
                 : (msg.body ?? ''),
           );
+
+          try { await FirestoreService().logEvent('alert_shown', 'Suspicious alert shown (foreground)'); } catch (_) {}
         }
       }
     } catch (e) {

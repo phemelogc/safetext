@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../utils/translations.dart';
 import '../main.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../firebase/firestore_service.dart';
 
 class EducationHubScreen extends StatelessWidget {
   const EducationHubScreen({super.key});
@@ -70,7 +72,35 @@ class EducationHubScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                ...topics.map((topic) => _buildTopicCard(context, topic, lang)),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirestoreService().getPublishedAlerts(),
+                  builder: (context, snapshot) {
+                    final firestoreTopics = <Map<String, String>>[];
+                    if (snapshot.hasData) {
+                      for (var doc in snapshot.data!.docs) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        firestoreTopics.add({
+                          'title': data['title']?.toString() ?? 'Live Alert',
+                          'desc': data['content']?.toString() ?? data['description']?.toString() ?? '',
+                          'icon': 'info',
+                        });
+                      }
+                    }
+                    
+                    final allTopics = [...firestoreTopics, ...topics];
+                    
+                    if (snapshot.connectionState == ConnectionState.waiting && firestoreTopics.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: allTopics
+                          .map((topic) => _buildTopicCard(context, topic, lang))
+                          .toList(),
+                    );
+                  },
+                ),
                 const SizedBox(height: 24),
                 _buildMockAppsSection(lang, context),
               ]),

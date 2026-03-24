@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api.dart';
 import '../utils/translations.dart';
 import '../main.dart';
+import '../firebase/firestore_service.dart';
 
 class MessageDetailScreen extends StatefulWidget {
   final SmsMessage message;
@@ -87,9 +88,24 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        try { await FirestoreService().logEvent('message_scanned', 'Manual scan from detail screen'); } catch (_) {}
+        
+        final conf = (data['confidence'] as num?)?.toDouble();
+        if (conf != null && conf >= 0.8) {
+          try {
+            await FirestoreService().writeFlaggedMessage(
+               messageText: messageBody,
+               senderNumber: widget.message.address ?? '',
+               confidenceScore: conf,
+               patternTags: ['manual_scan'],
+            );
+          } catch (_) {}
+        }
+
         if (mounted) {
           setState(() {
-            _confidence = (data['confidence'] as num?)?.toDouble();
+            _confidence = conf;
             _flagged = data['flagged'] as bool? ?? false;
             _prediction = data['explanation'] as String? ?? '';
             _isLoading = false;
@@ -121,6 +137,11 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
   Future<void> _sendFeedback(bool isReport) async {
     final lang = SafeTextApp.localeNotifier.value;
     try {
+      if (isReport) {
+        try { await FirestoreService().logEvent('user_report', 'User reported suspicious message'); } catch (_) {}
+        try { await FirestoreService().reportSuspiciousNumber(widget.message.address ?? ''); } catch (_) {}
+      }
+      
       final url = Uri.parse(feedbackUrl);
       await http.post(
         url,

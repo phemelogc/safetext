@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'firebase/firebase_config.dart';
+import 'firebase/firestore_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +10,15 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await dotenv.load(fileName: ".env");
+    await FirebaseConfig.init();
+    await FirestoreService().logEvent('app_opened', 'App launched by user');
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
   await NotificationService.init();
   final prefs = await SharedPreferences.getInstance();
   final bool onboarded = prefs.getBool('onboarded') ?? false;
