@@ -21,9 +21,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.path.join("models", "smishing_model.pkl")
-VECTORIZER_PATH = os.path.join("models", "tfidf_vectorizer.pkl")
-REPORTS_PATH = os.path.join("data", "reports.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "models", "smishing_model.pkl")
+VECTORIZER_PATH = os.path.join(BASE_DIR, "models", "tfidf_vectorizer.pkl")
+REPORTS_PATH = os.path.join(BASE_DIR, "data", "reports.json")
 
 try:
     model = joblib.load(MODEL_PATH)
@@ -90,13 +91,13 @@ def predict(data: MessageRequest):
         cleaned = preprocess_text(message)
         features = vectorizer.transform([cleaned])
 
-        probability = model.predict_proba(features)[0][1]
-        is_flagged = probability >= 0.6
+        prob_val = float(model.predict_proba(features)[0][1])
+        is_flagged = bool(prob_val >= 0.6)
 
         return {
             "flagged": is_flagged,
-            "confidence": round(float(probability), 2),
-            "explanation": generate_explanation(probability)
+            "confidence": round(prob_val, 2),
+            "explanation": generate_explanation(prob_val)
         }
 
     except Exception:
