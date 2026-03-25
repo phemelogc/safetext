@@ -10,7 +10,7 @@ from datetime import datetime
 
 from utils import preprocess_text
 
-app = FastAPI()
+app = FastAPI(title="SafeText API", description="API for Smishing Detection and Feedback Collection", version="1.0")
 
 # Allow Flutter app access
 app.add_middleware(
