@@ -9,7 +9,7 @@
 #     r"gov[\-\.]payments|relief[\-\.]fund)",
 #     re.IGNORECASE,
 # )
-
+import re
 # ── NEW (tighter) ────────────────────────────────────────────────────────────
 _SUSPICIOUS_PATTERNS = re.compile(
     r"(verify[\-\.]now"           # verify-now.anything
