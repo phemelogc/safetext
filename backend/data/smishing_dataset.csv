@@ -1,0 +1,186 @@
+message,tags
+"Your OrangeMoney account has been credited with P500. Thank you for using OrangeMoney.",legit
+"Your Mascom bill of P120 is due on the 5th. Dial *130# to pay.",legit
+"FNBB: Your account balance is P1230.50 as of today. Visit any branch for more info.",legit
+"BTC: Your internet data bundle of 2GB has been activated. Enjoy browsing!",legit
+"Betway: Your withdrawal of P200 has been processed. Check your MyZaka wallet.",legit
+"DSTV: Your subscription has been renewed. Enjoy your favourite shows.",legit
+"Absa: Your card ending in 4521 was used for a purchase of P89 at Choppies.",legit
+"Stanbic: Your fixed deposit of P10000 has matured. Visit your nearest branch.",legit
+"WUC: Your water account is up to date. Next payment due: 01/05/2025.",legit
+"BPC: Load shedding scheduled for your area from 10am to 2pm today.",legit
+"Yango: Your ride has been completed. Total fare: P35. Thank you for riding with us.",legit
+"Hi, your parcel from the post office is ready for collection. Bring your ID.",legit
+"Reminder: Your appointment at Princess Marina Hospital is tomorrow at 9am.",legit
+"Thank you for shopping at Choppies. Your receipt has been emailed.",legit
+"Your BIUST student portal login was successful. Check your results online.",legit
+"Congratulations! You have won P50,000 in the Mascom Lucky Draw. Click bit.ly/claim-now to collect your prize immediately!","prize_bait,phishing_link,impersonation,urgency"
+"URGENT: Your OrangeMoney account is suspended. Verify your details at secure-login-orange.com within 24 hours or lose your funds.","urgency,phishing_link,impersonation,credential_harvest"
+"Dear customer, your BTC account has been compromised. Click bit.ly/btc-verify to reset your password now!","phishing_link,impersonation,urgency,credential_harvest"
+"You have won a brand new Samsung phone in our annual draw. Reply with your full name and omang number to claim.","prize_bait,credential_harvest"
+"ALERT: Suspicious login on your FNBB account. Verify at customerportal-fnbb.bw.net immediately.","urgency,phishing_link,impersonation,credential_harvest"
+"Send P200 madi jaanong to this number 71234567 and receive P2000 back guaranteed. Limited time!","fake_investment,urgency,setswana_bait"
+"Your account has been selected for a relief-fund-bw.net government stimulus of P5000. Click to register now.","phishing_link,prize_bait,urgency"
+"Hiring now! Earn P800 per day working from home. No experience needed. WhatsApp 77123456 to start today.","fake_job"
+"Invest P500 madi and get P5000 within 7 days. 100% guaranteed returns. Join our mosebo opportunity now.","fake_investment,setswana_bait"
+"ABSA BANK: Your debit card has been blocked. Please call 0800-ABSA or visit account-suspended-absa.com","urgency,impersonation,phishing_link,credential_harvest"
+"Dear valued customer, akhaonto ya gago e na le bothata. Tlhagisa omang ya gago go 71999888 now.","credential_harvest,setswana_bait,urgency"
+"You are owed P12,000 tax refund. Provide your bank details at gov-payments-bw.net to receive it.","phishing_link,credential_harvest,impersonation"
+"Congratulations! Your number was selected. Claim your P10,000 prize at tinyurl.com/bw-prize before it expires!","prize_bait,phishing_link,urgency"
+"FREE MONEY: Send your akhaonto details to receive P3000 from our mobile promotion. Act jaanong!","credential_harvest,setswana_bait,urgency"
+"Warning: Your mobile banking PIN has been entered incorrectly 3 times. Click goo.gl/reset-pin to unlock.","urgency,phishing_link,credential_harvest,impersonation"
+"We are looking for agents to distribute goods in your area. Earn P2000/week. No experience. Call 75001122.","fake_job"
+"URGENT: Your SIM card will be deactivated in 24 hours. Visit verify-now.bw.net to verify your identity.","urgency,phishing_link,credential_harvest"
+"Investment opportunity! Double your madi in 30 days with our crypto trading bot. Min P1000. WhatsApp 76543210.","fake_investment,setswana_bait"
+"You have been selected for a scholarship. Send P300 registration fee to 71112233 to secure your slot.","fake_job,urgency"
+"Dear Mascom user, your line will be disconnected. Confirm your details at mascom-verify.com immediately.","impersonation,phishing_link,urgency,credential_harvest"
+"Romela P100 and amogela P1000 in 24 hours. Guaranteed. This offer expires jaanong. Contact 77889900.","fake_investment,setswana_bait,urgency"
+"Win big at our casino! Get P500 free credit. Visit bit.ly/bw-casino and register with your bank details.","prize_bait,phishing_link,credential_harvest"
+"GOVERNMENT NOTICE: You qualify for a COVID relief payment of P2500. Register at relief-fund-bw.net today.","impersonation,phishing_link,credential_harvest"
+"Your OrangeMoney PIN has expired. Update it at orange-secure-login.com or your account will be blocked.","impersonation,phishing_link,urgency,credential_harvest"
+"Job vacancy: Office cleaner needed urgently in Gaborone. Salary P3500/month. Send omang copy to 75667788.","fake_job,credential_harvest"
+"Earn P1500 daily from home by simply liking posts on Facebook. Register at tinyurl.com/earn-bw today!","fake_job,phishing_link"
+"STANBIC BANK ALERT: Your account will be closed. Verify at stanbic-verify.com within 12 hours.","impersonation,phishing_link,urgency,credential_harvest"
+"Your number won P25,000 in the DSTV subscriber draw. Claim now at ow.ly/dstv-prize. Offer expires today!","prize_bait,phishing_link,impersonation,urgency"
+"We are hiring data capturers. Work from home. Earn P800/day. No experience needed. Whatsapp 77000111.","fake_job"
+"Exclusive investment: Put in P2000 madi and receive P20,000 within a week. Proven system. Text 76123456.","fake_investment,setswana_bait"
+"FNBB: Verify your online banking details at fnbb-customerportal.bw.net to avoid account suspension.","impersonation,phishing_link,urgency,credential_harvest"
+"Your BIUST bursary application has been approved. Pay P500 admin fee to 71234567 to receive your funds.","fake_job,urgency,credential_harvest"
+"ALERT: Someone tried to access your Absa account. Secure it now at absa-secure-login.com.","urgency,phishing_link,impersonation,credential_harvest"
+"Madi a gago a P5000 a go lebeletswe. Bua le rona go amogela. Tlhagisa omang le akhaonto ya gago jaanong.","credential_harvest,setswana_bait,urgency"
+"Click bit.ly/verify-account to confirm your mobile number or your account will be suspended today.","phishing_link,urgency,credential_harvest"
+"Hi you have been chosen for a P8000 government grant. To receive reply with your bank name and akhaonto number.","impersonation,credential_harvest,setswana_bait"
+"Limited slots available! Work as a mystery shopper and earn P1200/day. Apply at tinyurl.com/shopper-bw.","fake_job,phishing_link"
+"50% guaranteed monthly returns on investments starting P500. Join our fund. WhatsApp 77654321 now.","fake_investment,urgency"
+"Dear customer your MyZaka akhaonto has unusual activity. Verify at myzaka-verify.com or lose your madi.","impersonation,phishing_link,credential_harvest,urgency,setswana_bait"
+"You are invited to join our WhatsApp investment group. P1000 becomes P10000 in 10 days. Very safe.",fake_investment
+"Congratulations! Mascom has selected your number for a data bonus. Click goo.gl/mascom-data to activate.","prize_bait,phishing_link,impersonation"
+"URGENT NOTICE from BPC: Your electricity account is overdue. Pay now at bpc-payments-bw.net to avoid disconnection.","impersonation,phishing_link,urgency"
+"Ke a go romela madi a P2000 but first romela P200 go verify akhaonto ya gago. Tlotla.","fake_investment,setswana_bait,credential_harvest"
+"You have a pending ZIMRA refund of P3400. Submit your details at zimra-refund-bw.net to receive it.","impersonation,phishing_link,credential_harvest"
+"Earn easy madi online. Sign up at bit.ly/online-jobs-bw and start earning P500 per day from home.","fake_job,phishing_link,setswana_bait"
+"Your Betway account has been suspended for security reasons. Verify at betway-verify.bw.net immediately.","impersonation,phishing_link,urgency,credential_harvest"
+"We are recruiting part-time promoters for a new product launch. P100 per hour. Reply your name and omang.","fake_job,credential_harvest"
+"Investment alert: Guaranteed 200% returns in 2 weeks. Risk-free. Minimum P300 madi. Contact 76001122.","fake_investment,setswana_bait"
+"Your Stanbic salary akhaonto has been flagged. Call us at 0800-111-222 or visit account-suspended.stanbic.com","impersonation,phishing_link,urgency,credential_harvest"
+"Dear Winner, your mobile number has won P100,000 in our international lottery. Contact us to claim your prize.","prize_bait"
+"Hi there! You qualify for a personal loan of up to P50,000. No credit check. Apply at tinyurl.com/fast-loan.","fake_investment,phishing_link"
+"Orange Botswana: We have noticed unusual activity. Confirm your omang at orange-id-verify.com now.","impersonation,phishing_link,credential_harvest,setswana_bait,urgency"
+"NOTICE: Your NDB account requires verification. Click bit.ly/ndb-verify within 48 hours to avoid closure.","impersonation,phishing_link,urgency,credential_harvest"
+"Data entry jobs available. Work from home. P600/day. Send CV and omang copy to hr@jobs-bw-hiring.com.","fake_job,credential_harvest"
+"Madi bonus! Recharge P20 and get P100 airtime free. Offer valid jaanong only. Dial *120# to activate.","prize_bait,setswana_bait,urgency"
+"Your number has been selected for a free P200 data bundle from Mascom. Claim at ow.ly/mascom-free-data.","prize_bait,phishing_link,impersonation"
+"Earn P5000 per week selling our weight loss products from home. No investment. WhatsApp 77321654.","fake_job"
+"ABSA: Your online banking has been locked. Update your PIN at absa-online-secure.bw.net now.","impersonation,phishing_link,urgency,credential_harvest"
+"Send P50 to 71112233 and receive P500 back within 1 hour. Guaranteed. Many have tried and succeeded!","fake_investment,urgency"
+"Your FNBB card has been used at an ATM in Johannesburg. If not you, call 0800-FNBB or click bit.ly/fnbb-alert.","impersonation,phishing_link,urgency,credential_harvest"
+"Free job: Work as a brand ambassador for Choppies. Earn P150/day. Register at tinyurl.com/choppies-jobs.","fake_job,phishing_link,impersonation"
+"You won a car in our prize draw! To claim call 75999888 and provide your full name, address and omang.","prize_bait,credential_harvest"
+"Mosebo o mo gona! Rekruta batho le ipoloke P2000 ka kgwedi. Join now at bit.ly/pyramid-bw.","fake_investment,setswana_bait,phishing_link"
+"Bank of Botswana security alert: Your account needs verification. Visit bob-verify.com within 24 hours.","impersonation,phishing_link,urgency,credential_harvest"
+"NEW INVESTMENT: Put in P1000 and earn P5000 weekly. Forex trading profits shared. Contact 77445566.","fake_investment"
+"Congratulations, you have been pre-approved for a P20,000 loan. No collateral. Send omang to 75113344.","prize_bait,credential_harvest"
+"URGENT: Your SIM card verification is pending. Complete at verify-now.mascom.com to avoid deactivation.","urgency,phishing_link,impersonation,credential_harvest"
+"Ke nna broker wa forex. Romela P500 madi and double it in 5 days. Proven. 77654321.","fake_investment,setswana_bait"
+"You have qualified for a P7500 BNPC housing subsidy. Register your akhaonto details at gov-payments.bw.net.","impersonation,phishing_link,credential_harvest,setswana_bait"
+"OFFER: Be a field agent for our survey company. Earn P200 per interview. Apply with your omang at tinyurl.com/survey-bw.","fake_job,phishing_link,credential_harvest"
+"Your Mascom number expires in 48hrs. To keep it active click bit.ly/mascom-renew and verify your details.","impersonation,phishing_link,urgency,credential_harvest"
+"WIN WIN WIN! You have won a Botswana Tourism holiday voucher worth P15,000. Claim at ow.ly/bw-tourism-win.","prize_bait,phishing_link,urgency"
+"IMPORTANT: Stanbic Bank requires you to update KYC details. Visit stanbic-kyc-update.bw.net or account closes.","impersonation,phishing_link,urgency,credential_harvest"
+"Part-time job for students: Earn P500/day delivering packages. Call 76001234. No experience needed.","fake_job"
+"Congratulations! You have been selected to receive P3000 BOSEJA grant. Confirm your details via SMS to 76001122.","prize_bait,credential_harvest,impersonation"
+"ABSA: We noticed a login from a new device. Confirm it was you at absa-device-verify.com or we will block it.","impersonation,phishing_link,urgency,credential_harvest"
+"Limited opportunity: 300% profit on binary options trading. Start with P500 madi. Text 75998877.","fake_investment,setswana_bait,urgency"
+"Your phone number has been randomly selected to win P50,000 cash. Reply YES to claim now!","prize_bait,urgency"
+"Dear subscriber, your internet plan will expire in 1 hour. Renew at tinyurl.com/btc-renew to avoid interruption.","impersonation,phishing_link,urgency"
+"Online typing jobs available. Earn P400/hour working from home. No experience. Register at bit.ly/typing-jobs-bw.","fake_job,phishing_link"
+"NOTICE: Government of Botswana COVID-19 relief payments are now open. Apply at relief-fund.gov-payments.bw.net.","impersonation,phishing_link,credential_harvest"
+"Romela P1000 madi go number 71223344 and amogela P5000 after 3 days. Guaranteed mosebo profit.","fake_investment,setswana_bait,urgency"
+"FNBB: Unusual activity detected on your account. Secure it at fnbb-secure.bw.net immediately.","impersonation,phishing_link,urgency,credential_harvest"
+"Free data: Mascom is giving 5GB free to all subscribers. Claim at bit.ly/mascom-5gb before midnight.","prize_bait,phishing_link,impersonation,urgency"
+"WUC: Your water connection will be cut off. Pay outstanding balance at wuc-pay.bw.net immediately.","impersonation,phishing_link,urgency"
+"Earn passive income! Invest P2000 madi in our agriculture cooperative. Monthly returns of 30%. 76887766.","fake_investment,setswana_bait"
+"Congratulations! As an Orange customer you have won a smartphone. Collect at orange-prize.bw.net today.","prize_bait,phishing_link,impersonation,urgency"
+"Your BTC WiFi password will be reset. Click bit.ly/btc-wifi-verify to keep your current password.","impersonation,phishing_link,urgency,credential_harvest"
+"Part time data capturers needed for Gaborone office. P700/day. Bring omang for interview on Monday.","fake_job,credential_harvest"
+"Make P3000 a day liking videos on YouTube. No experience needed. Join at tinyurl.com/youtube-earner-bw.","fake_job,phishing_link"
+"ALERT: Someone is attempting to transfer P5000 from your account. Confirm at absa-transfer-verify.com now.","impersonation,phishing_link,urgency,credential_harvest"
+"Ke a go file: Rekruta 3 batho and earn P1500 bonus. Multi-level mosebo le madi e ntsi jaanong!","fake_investment,setswana_bait,urgency"
+"You qualify for a DSTV loyalty bonus of P1000. Claim at dstv-loyalty-bw.net with your subscription number.","prize_bait,phishing_link,impersonation,credential_harvest"
+"Job offer: Mobile money agent wanted. Earn P2000/month commission. Send CV and omang to 77334455.","fake_job,credential_harvest"
+"Mascom Rewards: You have accumulated 5000 points. Redeem at mascom-rewards.bw.net for cash or airtime.","prize_bait,phishing_link,impersonation"
+"Hi, my name is Sarah. I need someone trustworthy to receive P500,000 on my behalf. I will pay you 20%.","fake_investment"
+"Orange: Your data bundle has expired. Reactivate at orange-data-activate.com to avoid browsing charges.","impersonation,phishing_link,urgency,credential_harvest"
+"We are urgently hiring 50 people for a new hotel opening in Kasane. Salary P4000. Send omang to hr@kasane-hotel.bw.","fake_job,credential_harvest"
+"Your YUMBI account requires verification. Visit yumbi-verify-bw.net within 24 hours.","impersonation,phishing_link,urgency,credential_harvest"
+"Earn P200 per referral in our marketing program. Just share our link: bit.ly/referral-earn-bw. No limit!","fake_job,phishing_link"
+"BOSEJA: P5000 youth empowerment grant available. Apply with your omang at boseja-bw.gov-payments.net.","impersonation,phishing_link,credential_harvest"
+"Congratulations, you are our 1,000,000th visitor! Click bit.ly/visitor-prize to claim your P10,000 prize!","prize_bait,phishing_link,urgency"
+"Investment club: Join for P500 and earn P2500 weekly. Only 10 slots left. Call 75112233 jaanong.","fake_investment,setswana_bait,urgency"
+"FNBB online banking maintenance complete. Verify your profile at fnbb-verify.bw.net to restore access.","impersonation,phishing_link,credential_harvest"
+"Ke a romela madi go wena. First confirm akhaonto ya gago by sending your PIN to this number.","credential_harvest,setswana_bait"
+"URGENT: Tax authority requires additional information. Submit at revenue-bw.gov-payments.net by Friday.","impersonation,phishing_link,urgency,credential_harvest"
+"Hi, this is your neighbor. Can you please send P50 via Orange Money? I will pay you back tomorrow.",legit
+"Please confirm your appointment for Thursday 3pm at the Gaborone City Council offices.",legit
+"Your Botswana Guardian subscription renewal is due. Pay at any FNB branch or via internet banking.",legit
+"BIUST Library: Books you borrowed are due for return on 15 April 2025. Please return to avoid fines.",legit
+"Mass vaccination exercise in Gaborone this weekend. Bring your omang and health booklet.",legit
+"Your Choppies loyalty card has P45 in rewards. Present it at checkout to redeem on your next purchase.",legit
+"BotswanaPost: A registered letter is awaiting collection at your nearest post office. Bring your ID.",legit
+"Ministry of Education: Grade 12 results are now available. Check at results.moe.gov.bw or BGCSE portal.",legit
+"Thank you for visiting Mater Dei Hospital. Your prescription is ready for collection at the pharmacy.",legit
+"Mascom: Your number has been active for 5 years! Thank you for being a loyal customer. Dial *130# for offers.",legit
+"Orange Money: You have received P150 from 77223344. Your new balance is P430. Thank you.",legit
+"Your FNB loan repayment of P800 is due on the 25th. Ensure funds are available to avoid penalties.",legit
+"Road Transport Department: Your vehicle licence expires on 30 April 2025. Renew at any DRT office.",legit
+"BNPC Housing: Your application has been received and is being processed. We will contact you within 30 days.",legit
+"Debswana Employee Services: Your payslip for March is available on the ESS portal.",legit
+"This is a reminder that your car service is due in 500km. Book at Gaborone Motors.",legit
+"Your Amazon order has been shipped. Tracking number: AZ123456789. Estimated delivery: 10-15 days.",legit
+"Reminder from Dr. Moatlhodi: Please take your medication as prescribed. Refills available at any pharmacy.",legit
+"BotswanaPost: Your parcel from China is held at customs. Visit customs office with your ID and invoice.",legit
+"Your DSTV subscription of P399 has been renewed for DStv Compact. Enjoy uninterrupted viewing!",legit
+"MyZaka: Your cash-out request of P500 has been confirmed. Collect at any Mascom dealer.",legit
+"Stanbic Bank: Your monthly account statement is ready. Log in to online banking to view it.",legit
+"FNBB: A new beneficiary has been added to your profile. If this was not you, call 3170000 immediately.",legit
+"Thank you for renewing your road tax. Your receipt number is RT2024-56789. Keep this for your records.",legit
+"Botswana Tourism: Book your Okavango experience today! Special packages available at all travel agents.",legit
+"Your electricity token of P100 for meter 1234567 is: 1234-5678-9012-3456. Load within 48 hours.",legit
+"Reminder: Board meeting tomorrow at 9am in the main conference room. Please review the agenda beforehand.",legit
+"Your application for a business license has been approved. Collect at Gaborone City Council on Monday.",legit
+"ABSA: Your cheque book is ready for collection at your nearest branch. Bring your ID.",legit
+"Orange: Your contract is due for renewal. Visit any Orange shop for the latest handset deals.",legit
+"VERIFY NOW: Your BTC account needs immediate verification. Visit btc-account-verify.bw.net or service stops.","urgency,phishing_link,impersonation,credential_harvest"
+"Tsa mosebo: Rekruta bareki ba ba 5 and earn P3000 bonus. Multi-level system. Whatsapp 75667788.","fake_job,setswana_bait,fake_investment"
+"Your Betway account has P500 pending withdrawal. Verify your akhaonto at betway-withdraw.bw.net to receive.","impersonation,phishing_link,credential_harvest,setswana_bait"
+"PRIZE ALERT: You won P5000 from Choppies anniversary draw! Claim at choppies-prize.bw.net jaanong!","prize_bait,phishing_link,impersonation,urgency,setswana_bait"
+"We found your CV online. Urgent driver vacancy. P5000/month. Send omang to confirm your interest.","fake_job,credential_harvest"
+"Dear customer, akhaonto ya gago e ganetse. Tlhagisa OMANG le PIN go restore. Call 74000111.","credential_harvest,setswana_bait,urgency,impersonation"
+"Double your investment in 14 days! Minimum P200 madi accepted. Join our WhatsApp group: bit.ly/invest-bw.","fake_investment,setswana_bait,phishing_link"
+"Your number was selected in the SADC mobile lottery. Prize of P30,000. Confirm with your omang number now.","prize_bait,credential_harvest"
+"GOVERNMENT: You qualify for monthly P1000 social welfare payment. Register at welfare-bw.gov-payments.net.","impersonation,phishing_link,credential_harvest"
+"Earn P1000 jaanong by completing our survey at tinyurl.com/survey-earn. Takes only 5 minutes!","fake_job,phishing_link,setswana_bait,urgency"
+"Hello, I am looking for a trustworthy person to help transfer USD 500,000 from an inheritance. 30% yours.",fake_investment
+"MAXIT alert: Unusual login detected. Confirm your password at maxit-secure.bw.net within 1 hour.","impersonation,phishing_link,urgency,credential_harvest"
+"Ke bua le wena ka putso ya gago. Salary ya gago e leng P3500 e sireletsegile. Tlhagisa akhaonto jaanong.","credential_harvest,setswana_bait,urgency"
+"Be a paid tester for new apps. Earn P400/hour. Work from home. Register at bit.ly/app-tester-bw.","fake_job,phishing_link"
+"You have been approved for a micro-loan of P5000. No paperwork. Receive madi in 1 hour. Call 75887766.","fake_investment,setswana_bait,urgency"
+"Crypto investment alert: P1000 can grow to P15000 in 3 weeks using our algorithm. 100% safe. 76778899.","fake_investment,urgency"
+"Mascom KYC update required. Verify your ID at mascom-kyc-update.com to keep your number active.","impersonation,phishing_link,urgency,credential_harvest"
+"ABSA notice: New security update requires your akhaonto verification at absa-update.bw.net by tomorrow.","impersonation,phishing_link,urgency,credential_harvest,setswana_bait"
+"Your Shoprite loyalty points expire on Friday. Redeem at shoprite-rewards.bw.net before they are gone!","prize_bait,phishing_link,urgency"
+"Earn real madi from social media! Like and share posts for P200/day. Sign up at ow.ly/social-earn-bw.","fake_job,phishing_link,setswana_bait"
+"NOTICE: Your vehicle was caught by a speed camera. Pay the fine of P500 at traffic-fines-bw.net now.","impersonation,phishing_link,urgency,credential_harvest"
+"Lucky subscriber! Orange has chosen your number to win 10GB data. Activate at t.co/orange-data-bw.","prize_bait,phishing_link,impersonation"
+"We need field researchers in all 10 districts. P800/day. No degree needed. Apply with omang at 76551122.","fake_job,credential_harvest"
+"Putso ya gago ya letsatsi le le tlang e tlile. Amogela P5000. Tlhagisa akhaonto ya gago go 71334455 jaanong.","credential_harvest,setswana_bait,urgency,fake_investment"
+"BIUST student union: Emergency meeting tomorrow 5pm at the main hall regarding new student fees. Mandatory.",legit
+"Your Internet Bundle from Orange expires in 3 days. Recharge at any Orange outlet or dial *130#.",legit
+"Reminder: Submit your income tax returns before 30 June. Visit any BURS office for assistance.",legit
+"Your parcel from ZARA has arrived in Botswana. Expected delivery in 5-7 business days.",legit
+"Police recruitment: Applications open until 31 March 2025. Download form at police.gov.bw.",legit
+"Your Stanbic standing order of P2000 for mortgage payment has been processed successfully.",legit
+"Congratulations on your graduation! Your certificate collection date is 15 May 2025. Bring your student card.",legit
+"DSTV: Your decoder has been authorised. You can now view all channels on your DStv Compact package.",legit
+"Monthly network maintenance scheduled for Sunday 2am-5am. Services may be intermittent during this time.",legit
+"Your blood donation appointment is confirmed for Saturday 10am at Gaborone Private Hospital. Thank you!",legit

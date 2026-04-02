@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import joblib
 import os
 import json
@@ -10,11 +10,12 @@ import threading
 from datetime import datetime
 
 from utils import preprocess_text
+from sender_reputation import get_sender_tier, has_phishing_link
 
 app = FastAPI(
     title="SafeText API",
     description="API for Smishing Detection, Feedback Collection, and Continuous Learning",
-    version="2.0",
+    version="3.0",
 )
 
 # Allow Flutter app access
@@ -30,31 +31,66 @@ app.add_middleware(
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH      = os.path.join(BASE_DIR, "models", "smishing_model.pkl")
 VECTORIZER_PATH = os.path.join(BASE_DIR, "models", "tfidf_vectorizer.pkl")
-REPORTS_PATH    = os.path.join(BASE_DIR, "data", "reports.json")
-STATUS_PATH     = os.path.join(BASE_DIR, "data", "retrain_status.json")
+BINARIZER_PATH  = os.path.join(BASE_DIR, "models", "label_binarizer.pkl")
+REPORTS_PATH    = os.path.join(BASE_DIR, "data",   "reports.json")
+STATUS_PATH     = os.path.join(BASE_DIR, "data",   "retrain_status.json")
 
 # Auto-retrain every time this many NEW feedback entries are collected
 RETRAIN_EVERY = 10
 
-# ── Model state (module-level so hot-reload works) ───────────────────────────
+# ── Model state ──────────────────────────────────────────────────────────────
 model      = None
 vectorizer = None
-_retrain_lock = threading.Lock()   # prevent concurrent retrains
+binarizer  = None
+_retrain_lock = threading.Lock()
 
 
 def _load_models():
-    """Load (or reload) model and vectorizer from disk."""
-    global model, vectorizer
+    """Load (or reload) model artefacts from disk."""
+    global model, vectorizer, binarizer
     try:
         model      = joblib.load(MODEL_PATH)
         vectorizer = joblib.load(VECTORIZER_PATH)
+        binarizer  = joblib.load(BINARIZER_PATH)
     except Exception:
         traceback.print_exc()
         model      = None
         vectorizer = None
+        binarizer  = None
 
 
 _load_models()
+
+
+# ── Tag explanations ──────────────────────────────────────────────────────────
+TAG_EXPLANATIONS = {
+    "phishing_link":     "contains a suspicious link",
+    "urgency":           "uses urgent language to pressure you",
+    "credential_harvest": "is asking for personal or financial details",
+    "prize_bait":        "is offering a prize or reward that seems too good to be true",
+    "impersonation":     "appears to be impersonating a trusted company",
+    "fake_job":          "is advertising a suspicious job opportunity",
+    "fake_investment":   "is promoting an investment that promises unrealistic returns",
+    "setswana_bait":     "uses local language to appear more legitimate",
+}
+
+
+def generate_explanation(tags: list, confidence: float) -> str:
+    """Build a human-readable explanation from detected tags."""
+    active = [TAG_EXPLANATIONS[t] for t in tags if t in TAG_EXPLANATIONS]
+    if not active:
+        return "This message appears safe, but always remain cautious."
+
+    if len(active) == 1:
+        sentence = f"This message {active[0]}."
+    elif len(active) == 2:
+        sentence = f"This message {active[0]} and {active[1]}."
+    else:
+        parts = ", ".join(active[:-1])
+        sentence = f"This message {parts}, and {active[-1]}."
+
+    sentence = sentence[0].upper() + sentence[1:]
+    return sentence
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,7 +108,7 @@ def _append_report(entry: dict):
     reports.append(entry)
     with open(REPORTS_PATH, "w") as f:
         json.dump(reports, f, indent=2)
-    return len(reports)   # return total count so caller can decide to retrain
+    return len(reports)
 
 
 def _feedback_count() -> int:
@@ -88,21 +124,9 @@ def _read_status() -> dict:
     return {"last_retrain": None}
 
 
-def generate_explanation(probability: float) -> str:
-    if probability >= 0.85:
-        return "This message strongly resembles known scam patterns. Avoid clicking links or sharing personal information."
-    if probability >= 0.65:
-        return "This message contains suspicious wording commonly found in scam messages."
-    return "This message appears safe, but always remain cautious."
-
-
-# ── Background retrain ───────────────────────────────────────────────────────
+# ── Background retrain ────────────────────────────────────────────────────────
 def _background_retrain():
-    """
-    Run retrain.run_retrain() in a background thread.
-    Reloads model files into memory when done so predictions
-    immediately benefit from the new model — no restart needed.
-    """
+    """Run retrain pipeline in a background thread, then hot-swap model files."""
     if not _retrain_lock.acquire(blocking=False):
         print("[retrain] Already in progress, skipping.")
         return
@@ -110,29 +134,31 @@ def _background_retrain():
         from retrain import run_retrain
         result = run_retrain()
         print(f"[retrain] Done: {result}")
-        _load_models()   # hot-swap the updated model
+        _load_models()
     except Exception:
         traceback.print_exc()
     finally:
         _retrain_lock.release()
 
 
-# ── Schemas ──────────────────────────────────────────────────────────────────
+# ── Schemas ───────────────────────────────────────────────────────────────────
 class MessageRequest(BaseModel):
     message: str
+    sender: Optional[str] = None
 
 
 class FeedbackRequest(BaseModel):
     message: str
-    label: str          # 'legit' | 'report' | 'safe' | 'smishing'
+    label: str                      # 'legit' | 'report' | 'safe' | 'smishing'
     address: Optional[str] = None
+    tags: Optional[List[str]] = []  # tags the user confirmed e.g. ["phishing_link"]
 
 
-# ── Endpoints ────────────────────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     return {
-        "status": "ok" if model and vectorizer else "model_not_loaded",
+        "status": "ok" if (model and vectorizer and binarizer) else "model_not_loaded",
         "feedback_collected": _feedback_count(),
         "retrain_every": RETRAIN_EVERY,
     }
@@ -140,24 +166,75 @@ def health():
 
 @app.post("/predict")
 def predict(data: MessageRequest):
-    if not model or not vectorizer:
-        raise HTTPException(status_code=500, detail="Model not available")
-
     message = data.message
+    sender  = (data.sender or "").strip()
+
     if not message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # ── Tier 1: trusted sender ────────────────────────────────────────────────
+    tier = get_sender_tier(sender) if sender else "unknown"
+
+    if tier == "trusted":
+        if has_phishing_link(message):
+            return {
+                "flagged":     True,
+                "confidence":  0.95,
+                "tags":        ["phishing_link", "impersonation"],
+                "sender_tier": "trusted",
+                "explanation": (
+                    "This message appears to come from a known sender "
+                    "but contains a suspicious link — it may be spoofed."
+                ),
+            }
+        return {
+            "flagged":     False,
+            "confidence":  0.99,
+            "tags":        ["legit"],
+            "sender_tier": "trusted",
+            "explanation": "Trusted sender. This message appears legitimate.",
+        }
+
+    # ── Model required ─────────────────────────────────────────────────────────
+    if not model or not vectorizer or not binarizer:
+        raise HTTPException(status_code=500, detail="Model not available")
 
     try:
         cleaned  = preprocess_text(message)
         features = vectorizer.transform([cleaned])
 
-        prob_val  = float(model.predict_proba(features)[0][1])
-        is_flagged = bool(prob_val >= 0.6)
+        # predict_proba returns shape (n_samples, n_classes) per estimator
+        # For OvR, model.estimators_[i].predict_proba gives [[p_neg, p_pos]]
+        tag_names = binarizer.classes_.tolist()
+        probs = []
+        for estimator in model.estimators_:
+            prob_positive = float(estimator.predict_proba(features)[0][1])
+            probs.append(prob_positive)
+
+        # Apply confidence floor for flagged senders
+        confidence_floor = 0.75 if tier == "flagged" else 0.0
+
+        THRESHOLD = 0.45
+        detected_tags = [
+            tag for tag, prob in zip(tag_names, probs)
+            if prob >= THRESHOLD and tag != "legit"
+        ]
+
+        max_confidence = max(probs) if probs else 0.0
+        # Apply floor: if sender is flagged, confidence is at least 0.75
+        max_confidence = max(max_confidence, confidence_floor)
+
+        flagged = bool(detected_tags) or max_confidence >= 0.6
+
+        if not flagged:
+            detected_tags = ["legit"]
 
         return {
-            "flagged":     is_flagged,
-            "confidence":  round(prob_val, 2),
-            "explanation": generate_explanation(prob_val),
+            "flagged":     flagged,
+            "confidence":  round(max_confidence, 2),
+            "tags":        detected_tags,
+            "sender_tier": tier,
+            "explanation": generate_explanation(detected_tags, max_confidence),
         }
 
     except Exception:
@@ -167,7 +244,6 @@ def predict(data: MessageRequest):
 
 @app.post("/feedback")
 def feedback(data: FeedbackRequest, background_tasks: BackgroundTasks):
-    # Normalise label
     raw = (data.label or "").lower()
     if raw in ("safe", "legit"):
         label = "legit"
@@ -181,24 +257,24 @@ def feedback(data: FeedbackRequest, background_tasks: BackgroundTasks):
         "message":   data.message,
         "label":     label,
         "address":   data.address,
+        "tags":      data.tags or [],
     }
     total = _append_report(entry)
 
-    # Trigger retrain when we hit a new multiple of RETRAIN_EVERY
     should_retrain = (total % RETRAIN_EVERY == 0)
     if should_retrain:
         background_tasks.add_task(_background_retrain)
 
     return {
-        "status":          "feedback received",
-        "total_feedback":  total,
-        "retrain_queued":  should_retrain,
+        "status":         "feedback received",
+        "total_feedback": total,
+        "retrain_queued": should_retrain,
     }
 
 
 @app.post("/retrain/trigger")
 def manual_retrain(background_tasks: BackgroundTasks):
-    """Manually kick off a retrain (useful for your future admin dashboard)."""
+    """Manually kick off a retrain."""
     if _retrain_lock.locked():
         return {"status": "retrain already in progress"}
     background_tasks.add_task(_background_retrain)
@@ -209,8 +285,8 @@ def manual_retrain(background_tasks: BackgroundTasks):
 def retrain_status():
     """Returns stats about the last retrain and current feedback count."""
     status = _read_status()
-    status["feedback_collected"] = _feedback_count()
-    status["retrain_in_progress"] = _retrain_lock.locked()
+    status["feedback_collected"]       = _feedback_count()
+    status["retrain_in_progress"]      = _retrain_lock.locked()
     status["next_retrain_at_feedback"] = (
         ((_feedback_count() // RETRAIN_EVERY) + 1) * RETRAIN_EVERY
     )
