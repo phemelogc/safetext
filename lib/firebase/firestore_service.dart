@@ -1,27 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io' show Platform;
+import '../services/write_queue.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // ── Device ID ─────────────────────────────────────────────────────────────
+
   Future<String> _getDeviceId() async {
     try {
-      final defaultId = 'unknown_device';
       final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return androidInfo.id;
+        return (await deviceInfo.androidInfo).id;
       } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.identifierForVendor ?? defaultId;
+        return (await deviceInfo.iosInfo).identifierForVendor ?? 'unknown_device';
       }
-      return defaultId;
-    } catch (e) {
-      print('Error getting device ID: $e');
+      return 'unknown_device';
+    } catch (_) {
       return 'unknown_device';
     }
   }
+
+  // ── Write: flagged message ────────────────────────────────────────────────
 
   Future<void> writeFlaggedMessage({
     required String messageText,
@@ -29,33 +30,39 @@ class FirestoreService {
     required double confidenceScore,
     required List<String> patternTags,
   }) async {
+    final deviceId = await _getDeviceId();
+    final data = {
+      'message_text': messageText,
+      'sender_number': senderNumber,
+      'confidence_score': confidenceScore,
+      'pattern_tags': patternTags,
+      'timestamp': Timestamp.now(),
+      'user_reported': false,
+      'status': 'pending',
+      'device_id': deviceId,
+    };
     try {
-      final deviceId = await _getDeviceId();
-      await _db.collection('flagged_messages').add({
-        'message_text': messageText,
-        'sender_number': senderNumber,
-        'confidence_score': confidenceScore,
-        'pattern_tags': patternTags,
-        'timestamp': Timestamp.now(),
-        'user_reported': false,
-        'status': 'pending',
-        'device_id': deviceId,
-      });
-    } catch (e) {
-      print('Error writing flagged message: $e');
+      await _db.collection('flagged_messages').add(data);
+    } catch (_) {
+      // Queue for retry when connectivity is restored.
+      await WriteQueue().enqueue(collection: 'flagged_messages', data: data);
     }
   }
 
+  // ── Write: report suspicious number ──────────────────────────────────────
+
   Future<void> reportSuspiciousNumber(String phoneNumber) async {
     try {
-      final querySnapshot = await _db
+      final query = await _db
           .collection('suspicious_numbers')
           .where('phone_number', isEqualTo: phoneNumber)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final docId = querySnapshot.docs.first.id;
-        await _db.collection('suspicious_numbers').doc(docId).update({
+      if (query.docs.isNotEmpty) {
+        await _db
+            .collection('suspicious_numbers')
+            .doc(query.docs.first.id)
+            .update({
           'report_count': FieldValue.increment(1),
           'last_reported': Timestamp.now(),
         });
@@ -68,10 +75,34 @@ class FirestoreService {
           'added_by': 'user',
         });
       }
-    } catch (e) {
-      print('Error reporting suspicious number: $e');
+    } catch (_) {
+      // Silently ignore — conditional logic cannot be queued reliably.
     }
   }
+
+  // ── Read: community number lookup ─────────────────────────────────────────
+
+  /// Returns the Firestore document if [phoneNumber] is confirmed as a
+  /// smishing number by the community, or null if safe / not found / offline.
+  Future<Map<String, dynamic>?> checkCommunityNumber(String phoneNumber) async {
+    if (phoneNumber.isEmpty) return null;
+    try {
+      final query = await _db
+          .collection('suspicious_numbers')
+          .where('phone_number', isEqualTo: phoneNumber)
+          .where('confirmed_smishing', isEqualTo: true)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        return query.docs.first.data();
+      }
+      return null;
+    } catch (_) {
+      return null; // offline or error — skip silently
+    }
+  }
+
+  // ── Read: educational alerts ──────────────────────────────────────────────
 
   Stream<QuerySnapshot> getPublishedAlerts() {
     return _db
@@ -81,17 +112,20 @@ class FirestoreService {
         .snapshots();
   }
 
+  // ── Write: app log ────────────────────────────────────────────────────────
+
   Future<void> logEvent(String eventType, String details) async {
+    final deviceId = await _getDeviceId();
+    final data = {
+      'event_type': eventType,
+      'timestamp': Timestamp.now(),
+      'device_id': deviceId,
+      'details': details,
+    };
     try {
-      final deviceId = await _getDeviceId();
-      await _db.collection('app_logs').add({
-        'event_type': eventType,
-        'timestamp': Timestamp.now(),
-        'device_id': deviceId,
-        'details': details,
-      });
-    } catch (e) {
-      print('Error logging event: $e');
+      await _db.collection('app_logs').add(data);
+    } catch (_) {
+      await WriteQueue().enqueue(collection: 'app_logs', data: data);
     }
   }
 }

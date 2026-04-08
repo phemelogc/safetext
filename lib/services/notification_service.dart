@@ -25,6 +25,8 @@ class NotificationService {
     await android?.requestNotificationsPermission();
   }
 
+  /// Shows a smishing alert notification.
+  /// Only call this when confidence >= 0.85.
   static Future<void> showSuspiciousAlert({
     required String from,
     required String bodySnippet,
@@ -32,15 +34,17 @@ class NotificationService {
     if (!_initialized) await init();
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'safetext_suspicious',
-      'Suspicious message alerts',
-      channelDescription: 'Alerts when a message is flagged as highly suspicious',
-      importance: Importance.high,
+      'Smishing Alert',
+      channelDescription:
+          'Alerts when an incoming message is flagged as a likely scam',
+      importance: Importance.max,
       priority: Priority.high,
     );
     await _plugin.show(
       id: 0,
-      title: 'Suspicious message',
-      body: 'From: ${from.isEmpty ? "Unknown" : from}',
+      title: '⚠️ Smishing Alert Detected',
+      body:
+          'A message from ${from.isEmpty ? "Unknown" : from} has been flagged as a likely scam. Tap to review.',
       notificationDetails: const NotificationDetails(android: androidDetails),
       payload: bodySnippet,
     );
