@@ -27,7 +27,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
   List<String> _tags = [];
   String _loadingMessage = '';
   bool _isOffline = false;
-  Map<String, dynamic>? _communityHit; // non-null if confirmed scammer
+  Map<String, dynamic>? _communityHit;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
@@ -39,18 +39,13 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeIn,
-    );
-
+    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
     _getPrediction();
-
-    Future.delayed(const Duration(seconds: 8), () {
+    // Show "waking server" hint if the Railway backend is cold-starting.
+    Future.delayed(const Duration(seconds: 6), () {
       if (mounted && _isLoading) {
         setState(() {
-          _loadingMessage = Translations.get(
-              'waking_server', SafeTextApp.localeNotifier.value);
+          _loadingMessage = Translations.get('waking_server', SafeTextApp.localeNotifier.value);
         });
       }
     });
@@ -62,83 +57,64 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     super.dispose();
   }
 
-  // ── Classification ────────────────────────────────────────────────────────
-
   Future<void> _getPrediction() async {
     final lang = SafeTextApp.localeNotifier.value;
-    final messageBody = widget.message.body ?? '';
+    final body = widget.message.body ?? '';
 
-    if (messageBody.trim().isEmpty) {
+    if (body.trim().isEmpty) {
       if (mounted) {
-        setState(() {
-          _prediction = Translations.get('error', lang);
-          _isLoading = false;
-        });
+        setState(() { _prediction = Translations.get('error', lang); _isLoading = false; });
         _animController.forward();
       }
       return;
     }
 
-    // Community number lookup (silent, parallel to classification).
-    final senderAddr = widget.message.address ?? '';
-    final communityFuture =
-        FirestoreService().checkCommunityNumber(senderAddr);
+    final sender = widget.message.address ?? '';
+    // Run community lookup in parallel with classification.
+    final communityFuture = FirestoreService().checkCommunityNumber(sender);
 
-    // Classify — try online first, fall back to offline.
     bool flagged = false;
     double confidence = 0.0;
     List<String> tags = [];
     String explanation = '';
     bool usedOffline = false;
 
-    final isOnline = ConnectivityService().isOnline;
-
-    if (isOnline) {
+    if (ConnectivityService().isOnline) {
       try {
         final response = await http
             .post(
               Uri.parse(predictUrl),
               headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'message': messageBody}),
+              body: jsonEncode({'message': body}),
             )
-            .timeout(
-              const Duration(seconds: 60),
-              onTimeout: () =>
-                  http.Response(jsonEncode({'error': 'timeout'}), 408),
-            );
+            // 12 seconds gives Railway cold-starts a chance; fails fast enough offline.
+            .timeout(const Duration(seconds: 12));
 
         if (response.statusCode == 200) {
-          final data =
-              jsonDecode(response.body) as Map<String, dynamic>;
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
           confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
           flagged = data['flagged'] as bool? ?? false;
           tags = List<String>.from(data['tags'] as List? ?? []);
           explanation = data['explanation'] as String? ?? '';
 
-          try {
-            await FirestoreService().logEvent(
-                'message_scanned', 'Manual scan from detail screen');
-          } catch (_) {}
+          try { await FirestoreService().logEvent('message_scanned', 'Detail screen scan'); } catch (_) {}
 
           if (confidence >= 0.85) {
             try {
               await FirestoreService().writeFlaggedMessage(
-                messageText: messageBody,
-                senderNumber: senderAddr,
+                messageText: body,
+                senderNumber: sender,
                 confidenceScore: confidence,
                 patternTags: tags,
               );
             } catch (_) {}
           }
-        } else if (response.statusCode == 408) {
-          // Timeout — fall back to offline.
-          throw Exception('timeout');
         } else {
-          throw Exception('non-200');
+          throw Exception('non-200 (${response.statusCode})');
         }
       } catch (_) {
         usedOffline = true;
-        final result = OfflineClassifier.classify(messageBody);
+        final result = OfflineClassifier.classify(body);
         flagged = result['flagged'] as bool;
         confidence = (result['confidence'] as num).toDouble();
         tags = List<String>.from(result['tags'] as List);
@@ -146,23 +122,25 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
       }
     } else {
       usedOffline = true;
-      final result = OfflineClassifier.classify(messageBody);
+      final result = OfflineClassifier.classify(body);
       flagged = result['flagged'] as bool;
       confidence = (result['confidence'] as num).toDouble();
       tags = List<String>.from(result['tags'] as List);
       explanation = result['explanation'] as String;
     }
 
-    // Merge any locally-detected tags not already present.
-    _mergeLocalTags(messageBody, tags);
+    // Locally detect URL tags not caught by the model.
+    final lower = body.toLowerCase();
+    final urlRegex = RegExp(r'https?://\S+', caseSensitive: false);
+    if ((urlRegex.hasMatch(body) || lower.contains('bit.ly') || lower.contains('tinyurl')) &&
+        !tags.contains('phishing_link')) {
+      tags.add('phishing_link');
+    }
 
-    // Await community lookup result.
     Map<String, dynamic>? communityHit;
-    try {
-      communityHit = await communityFuture;
-    } catch (_) {}
+    try { communityHit = await communityFuture; } catch (_) {}
 
-    // Community confirmed scammer overrides ML score.
+    // A community-confirmed scammer overrides the ML score.
     if (communityHit != null) {
       flagged = true;
       if (confidence < 0.95) confidence = 0.95;
@@ -182,34 +160,13 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     }
   }
 
-  /// Detect URL / link patterns from raw message text and add tags if missing.
-  void _mergeLocalTags(String body, List<String> tags) {
-    final lower = body.toLowerCase();
-    final urlRegex = RegExp(r'https?://\S+', caseSensitive: false);
-    if ((urlRegex.hasMatch(body) ||
-            lower.contains('bit.ly') ||
-            lower.contains('tinyurl')) &&
-        !tags.contains('phishing_link')) {
-      tags.add('phishing_link');
-    }
-  }
-
-  // ── Feedback ──────────────────────────────────────────────────────────────
-
   Future<void> _sendFeedback(bool isReport) async {
     final lang = SafeTextApp.localeNotifier.value;
     try {
       if (isReport) {
-        try {
-          await FirestoreService().logEvent(
-              'user_report', 'User reported suspicious message');
-        } catch (_) {}
-        try {
-          await FirestoreService()
-              .reportSuspiciousNumber(widget.message.address ?? '');
-        } catch (_) {}
+        try { await FirestoreService().logEvent('user_report', 'User reported message'); } catch (_) {}
+        try { await FirestoreService().reportSuspiciousNumber(widget.message.address ?? ''); } catch (_) {}
       }
-
       try {
         await http.post(
           Uri.parse(feedbackUrl),
@@ -220,14 +177,13 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
             'address': widget.message.address,
           }),
         );
-      } catch (_) {} // Offline — feedback will be lost, not critical.
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(Translations.get('feedback_sent', lang)),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ));
         if (isReport) {
           await _blockContact();
@@ -253,13 +209,10 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
       await prefs.setStringList('blockList', blockList);
     }
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$addr blocked')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$addr blocked')));
       Navigator.pop(context, true);
     }
   }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -269,10 +222,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          widget.message.address ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: Text(widget.message.address ?? 'Unknown',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
@@ -281,11 +232,10 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Community confirmed scammer banner
                     if (_communityHit != null) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -300,9 +250,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                             Expanded(
                               child: Text(
                                 '⚠️ This number has been confirmed as a scammer by the SafeText community',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -310,12 +258,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-
-                    // Offline mode indicator
                     if (_isOffline && !_isLoading) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade800,
                           borderRadius: BorderRadius.circular(12),
@@ -326,15 +271,12 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                             Icon(Icons.wifi_off, color: Colors.white, size: 16),
                             SizedBox(width: 8),
                             Text('Offline mode — keyword filter used',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 13)),
+                                style: TextStyle(color: Colors.white, fontSize: 13)),
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
                     ],
-
-                    // Message body card
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -342,7 +284,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -350,13 +292,10 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                       ),
                       child: Text(
                         widget.message.body ?? '',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontSize: 18, height: 1.5),
+                        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 18, height: 1.5),
                       ),
                     ),
                     const SizedBox(height: 32),
-
-                    // Loading or result
                     if (_isLoading)
                       Center(
                         child: Column(
@@ -382,19 +321,16 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                 ),
               ),
             ),
-
-            // Action buttons
             if (!_isLoading)
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   decoration: BoxDecoration(
                     color: theme.cardColor,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -4),
                       ),
@@ -409,10 +345,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                           label: Text(Translations.get('ignore', lang)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey.shade600,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                         ),
                       ),
@@ -424,10 +358,8 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
                           label: Text(Translations.get('report', lang)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                         ),
                       ),
@@ -442,39 +374,26 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
   }
 
   Widget _buildResultCard(ThemeData theme, String lang) {
-    final pct = _confidence != null
-        ? (_confidence! * 100).round()
-        : 0;
-    final barColor = pct >= 85
-        ? Colors.redAccent
-        : pct >= 50
-            ? Colors.orange
-            : Colors.green;
+    final pct = _confidence != null ? (_confidence! * 100).round() : 0;
+    final barColor = pct >= 85 ? Colors.redAccent : pct >= 50 ? Colors.orange : Colors.green;
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _flagged
-            ? Colors.red.withOpacity(0.1)
-            : Colors.green.withOpacity(0.1),
+        color: _flagged ? Colors.red.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: _flagged
-              ? Colors.redAccent.withOpacity(0.5)
-              : Colors.green.withOpacity(0.5),
+          color: _flagged ? Colors.redAccent.withValues(alpha: 0.5) : Colors.green.withValues(alpha: 0.5),
           width: 2,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status icon + label
           Row(
             children: [
               Icon(
-                _flagged
-                    ? Icons.warning_amber_rounded
-                    : Icons.check_circle_outline,
+                _flagged ? Icons.warning_amber_rounded : Icons.check_circle_outline,
                 color: _flagged ? Colors.redAccent : Colors.green,
                 size: 28,
               ),
@@ -492,8 +411,6 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
             ],
           ),
           const SizedBox(height: 12),
-
-          // Confidence progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
@@ -504,26 +421,16 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
             ),
           ),
           const SizedBox(height: 16),
-
-          // Explanation
           Text(
             _prediction,
-            style: TextStyle(
-              fontSize: 15,
-              color: theme.textTheme.bodyMedium?.color,
-              height: 1.4,
-            ),
+            style: TextStyle(fontSize: 15, color: theme.textTheme.bodyMedium?.color, height: 1.4),
           ),
-
-          // Pattern tag chips
           if (_tags.isNotEmpty) ...[
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 6,
-              children: _tags
-                  .map((tag) => _buildTagChip(tag))
-                  .toList(),
+              children: _tags.map(_buildTagChip).toList(),
             ),
           ],
         ],
@@ -536,22 +443,17 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: info.color.withOpacity(0.2),
+        color: info.color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: info.color.withOpacity(0.6)),
+        border: Border.all(color: info.color.withValues(alpha: 0.6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(info.icon, size: 13, color: info.color),
           const SizedBox(width: 5),
-          Text(
-            info.label,
-            style: TextStyle(
-                fontSize: 12,
-                color: info.color,
-                fontWeight: FontWeight.w600),
-          ),
+          Text(info.label,
+              style: TextStyle(fontSize: 12, color: info.color, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -559,28 +461,16 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
 
   _TagInfo _tagInfo(String tag) {
     switch (tag) {
-      case 'urgency':
-        return _TagInfo('Urgent Language', Colors.orange, Icons.alarm);
-      case 'phishing_link':
-        return _TagInfo('Suspicious Link', Colors.red, Icons.link_off);
-      case 'prize_bait':
-        return _TagInfo('Prize Bait', Colors.amber, Icons.card_giftcard);
-      case 'credential_harvest':
-        return _TagInfo(
-            'Credential Request', Colors.deepOrange, Icons.lock_open);
-      case 'impersonation':
-        return _TagInfo('Impersonation', Colors.purple, Icons.person_off);
-      case 'setswana_bait':
-        return _TagInfo('Setswana Bait', Colors.teal, Icons.translate);
-      case 'offline_filter':
-        return _TagInfo('Offline Filter', Colors.blueGrey, Icons.wifi_off);
-      case 'fake_job':
-        return _TagInfo('Fake Job', Colors.indigo, Icons.work_off);
-      case 'fake_investment':
-        return _TagInfo(
-            'Fake Investment', Colors.brown, Icons.trending_down);
-      default:
-        return _TagInfo(tag, Colors.grey, Icons.label_outline);
+      case 'urgency':         return _TagInfo('Urgent Language',     Colors.orange,     Icons.alarm);
+      case 'phishing_link':   return _TagInfo('Suspicious Link',     Colors.red,        Icons.link_off);
+      case 'prize_bait':      return _TagInfo('Prize Bait',          Colors.amber,      Icons.card_giftcard);
+      case 'credential_harvest': return _TagInfo('Credential Request', Colors.deepOrange, Icons.lock_open);
+      case 'impersonation':   return _TagInfo('Impersonation',       Colors.purple,     Icons.person_off);
+      case 'setswana_bait':   return _TagInfo('Setswana Bait',       Colors.teal,       Icons.translate);
+      case 'offline_filter':  return _TagInfo('Offline Filter',      Colors.blueGrey,   Icons.wifi_off);
+      case 'fake_job':        return _TagInfo('Fake Job',            Colors.indigo,     Icons.work_off);
+      case 'fake_investment':  return _TagInfo('Fake Investment',    Colors.brown,      Icons.trending_down);
+      default:                return _TagInfo(tag,                   Colors.grey,       Icons.label_outline);
     }
   }
 }

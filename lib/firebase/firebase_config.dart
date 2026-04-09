@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -13,9 +14,9 @@ class FirebaseConfig {
           messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
           appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
         ),
-      );
+      ).timeout(const Duration(seconds: 6));
     } catch (e) {
-      print('Firebase initialization error: $e');
+      debugPrint('Firebase init: $e');
     }
   }
 }

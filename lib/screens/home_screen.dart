@@ -17,15 +17,19 @@ import 'education_hub_screen.dart';
 import '../utils/translations.dart';
 import '../main.dart';
 import '../firebase/firestore_service.dart';
+import '../firebase/firebase_config.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// Confidence threshold for triggering a push notification.
 const double _kNotifyThreshold = 0.85;
 
-// ── Background SMS handler (separate isolate) ──────────────────────────────
-
+// Runs in a separate isolate when an SMS arrives while the app is closed.
 @pragma('vm:entry-point')
 Future<void> onBackgroundMessage(SmsMessage msg) async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+    await FirebaseConfig.init();
+  } catch (_) {}
   await NotificationService.init();
 
   final prefs = await SharedPreferences.getInstance();
@@ -36,7 +40,6 @@ Future<void> onBackgroundMessage(SmsMessage msg) async {
   double confidence = 0.0;
   List<String> tags = [];
 
-  // Try online classifier, fall back to offline.
   try {
     final response = await http
         .post(
@@ -45,21 +48,14 @@ Future<void> onBackgroundMessage(SmsMessage msg) async {
           body: jsonEncode({'message': msg.body ?? ''}),
         )
         .timeout(const Duration(seconds: 10));
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
       tags = List<String>.from(data['tags'] as List? ?? []);
-
-      try {
-        await FirestoreService().logEvent(
-            'message_scanned', 'Background message scanned');
-      } catch (_) {}
     } else {
       throw Exception('non-200');
     }
   } catch (_) {
-    // Backend unreachable — use offline classifier.
     final result = OfflineClassifier.classify(msg.body ?? '');
     confidence = (result['confidence'] as num).toDouble();
     tags = List<String>.from(result['tags'] as List);
@@ -74,22 +70,14 @@ Future<void> onBackgroundMessage(SmsMessage msg) async {
         patternTags: tags,
       );
     } catch (_) {}
-
     await NotificationService.showSuspiciousAlert(
       from: addr,
       bodySnippet: (msg.body ?? '').length > 60
           ? '${(msg.body ?? '').substring(0, 60)}...'
           : (msg.body ?? ''),
     );
-
-    try {
-      await FirestoreService().logEvent(
-          'alert_shown', 'Suspicious alert shown (background)');
-    } catch (_) {}
   }
 }
-
-// ── Home screen ───────────────────────────────────────────────────────────
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,19 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Track connectivity changes.
     _isOnline = ConnectivityService().isOnline;
     _connectivitySub = ConnectivityService().onStatusChange.listen((online) {
       if (mounted) setState(() => _isOnline = online);
     });
-
     _ensurePermissionAndLoadSms();
-
     _telephony.listenIncomingSms(
-      onNewMessage: (SmsMessage msg) async {
-        await _handleNewSms(msg);
-      },
+      onNewMessage: _handleNewSms,
       onBackgroundMessage: onBackgroundMessage,
       listenInBackground: true,
     );
@@ -136,8 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     super.dispose();
   }
-
-  // ── SMS loading ───────────────────────────────────────────────────────────
 
   Future<void> _ensurePermissionAndLoadSms() async {
     setState(() {
@@ -179,11 +159,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return !blockList.any((b) => addr.contains(b) || b.contains(addr));
       }).toList();
     } on PlatformException catch (e) {
-      debugPrint('Failed to load SMS: $e');
+      debugPrint('SMS load failed: $e');
     }
   }
-
-  // ── New SMS handling (foreground) ─────────────────────────────────────────
 
   Future<void> _handleNewSms(SmsMessage msg) async {
     final prefs = await SharedPreferences.getInstance();
@@ -205,20 +183,17 @@ class _HomeScreenState extends State<HomeScreen> {
             body: jsonEncode({'message': msg.body ?? ''}),
           )
           .timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
         tags = List<String>.from(data['tags'] as List? ?? []);
         try {
-          await FirestoreService().logEvent(
-              'message_scanned', 'Foreground message scanned');
+          await FirestoreService().logEvent('message_scanned', 'Foreground scan');
         } catch (_) {}
       } else {
         throw Exception('non-200');
       }
     } catch (_) {
-      // Offline fallback
       final result = OfflineClassifier.classify(msg.body ?? '');
       confidence = (result['confidence'] as num).toDouble();
       tags = List<String>.from(result['tags'] as List);
@@ -233,22 +208,17 @@ class _HomeScreenState extends State<HomeScreen> {
           patternTags: tags,
         );
       } catch (_) {}
-
       await NotificationService.showSuspiciousAlert(
         from: addr,
         bodySnippet: (msg.body ?? '').length > 60
             ? '${(msg.body ?? '').substring(0, 60)}...'
             : (msg.body ?? ''),
       );
-
       try {
-        await FirestoreService().logEvent(
-            'alert_shown', 'Suspicious alert shown (foreground)');
+        await FirestoreService().logEvent('alert_shown', 'Alert shown (foreground)');
       } catch (_) {}
     }
   }
-
-  // ── Scan Inbox ────────────────────────────────────────────────────────────
 
   Future<void> _scanInbox() async {
     showModalBottomSheet(
@@ -261,8 +231,6 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => _ScanInboxSheet(telephony: _telephony),
     );
   }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   List<SmsMessage> _filterByQuery(List<SmsMessage> list, String q) {
     if (q.trim().isEmpty) return list;
@@ -277,9 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (timestamp == null) return '';
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final now = DateTime.now();
-    if (now.year == date.year &&
-        now.month == date.month &&
-        now.day == date.day) {
+    if (now.year == date.year && now.month == date.month && now.day == date.day) {
       return DateFormat.jm().format(date);
     }
     return DateFormat.MMMd().format(date);
@@ -288,22 +254,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Color _getAvatarColor(String address) {
     if (address.isEmpty) return Colors.grey;
     final colors = [
-      Colors.redAccent,
-      Colors.blueAccent,
-      Colors.green,
-      Colors.orange,
-      Colors.deepPurpleAccent,
-      Colors.teal,
+      Colors.redAccent, Colors.blueAccent, Colors.green,
+      Colors.orange, Colors.deepPurpleAccent, Colors.teal,
     ];
     return colors[address.hashCode % colors.length];
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
-    final searchQuery = _searchController.text;
-    final messagesFiltered = _filterByQuery(_messages, searchQuery);
+    final messagesFiltered = _filterByQuery(_messages, _searchController.text);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -315,15 +274,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Offline banner
           if (!_isOnline)
             Material(
               color: Colors.orange.shade800,
               child: const SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       Icon(Icons.wifi_off, color: Colors.white, size: 18),
@@ -331,10 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           'Offline mode — using local keyword filter',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500),
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
@@ -344,11 +298,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           Expanded(
             child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              headerSliverBuilder: (context, _) => [
                 SliverAppBar(
                   title: Text(
-                    Translations.get(
-                        'app_title', SafeTextApp.localeNotifier.value),
+                    Translations.get('app_title', SafeTextApp.localeNotifier.value),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   floating: true,
@@ -356,12 +309,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.school_outlined),
-                      tooltip: Translations.get(
-                          'education_hub', SafeTextApp.localeNotifier.value),
+                      tooltip: Translations.get('education_hub', SafeTextApp.localeNotifier.value),
                       onPressed: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
-                            builder: (_) => const EducationHubScreen()),
+                        MaterialPageRoute(builder: (_) => const EducationHubScreen()),
                       ),
                     ),
                     IconButton(
@@ -396,16 +347,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: TextField(
                             controller: _searchController,
                             decoration: InputDecoration(
-                              hintText: Translations.get('search_messages',
-                                  SafeTextApp.localeNotifier.value),
-                              hintStyle:
-                                  TextStyle(color: Colors.grey.shade400),
-                              prefixIcon: const Icon(Icons.search,
-                                  color: Colors.grey),
+                              hintText: Translations.get('search_messages', SafeTextApp.localeNotifier.value),
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: const Icon(Icons.search, color: Colors.grey),
                               filled: true,
                               fillColor: Theme.of(context).cardColor,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 0, horizontal: 20),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30),
                                 borderSide: BorderSide.none,
@@ -428,31 +375,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             await _loadSms();
                             if (mounted) setState(() {});
                           },
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            child: messagesFiltered.isEmpty
-                                ? ListView(children: [
-                                    SizedBox(
-                                        height: MediaQuery.of(context)
-                                                .size
-                                                .height *
-                                            0.3),
-                                    const Center(
-                                      child: Text('No messages found.',
-                                          style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 16)),
-                                    ),
-                                  ])
-                                : ListView.builder(
-                                    padding: const EdgeInsets.only(
-                                        top: 8, bottom: 100),
-                                    itemCount: messagesFiltered.length,
-                                    itemBuilder: (context, index) =>
-                                        _buildMessageTile(
-                                            messagesFiltered[index]),
+                          child: messagesFiltered.isEmpty
+                              ? ListView(children: [
+                                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                                  const Center(
+                                    child: Text('No messages found.',
+                                        style: TextStyle(color: Colors.grey, fontSize: 16)),
                                   ),
-                          ),
+                                ])
+                              : ListView.builder(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 100),
+                                  itemCount: messagesFiltered.length,
+                                  itemBuilder: (_, i) => _buildMessageTile(messagesFiltered[i]),
+                                ),
                         ),
             ),
           ),
@@ -463,14 +398,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMessageTile(SmsMessage msg) {
     final address = msg.address ?? 'Unknown';
-    final initial = address.isNotEmpty ? address[0].toUpperCase() : '?';
-
     return InkWell(
       onTap: () async {
         final blocked = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
-              builder: (_) => MessageDetailScreen(message: msg)),
+          MaterialPageRoute(builder: (_) => MessageDetailScreen(message: msg)),
         );
         if (blocked == true && mounted) {
           await _loadSms();
@@ -487,11 +419,8 @@ class _HomeScreenState extends State<HomeScreen> {
               radius: 24,
               backgroundColor: _getAvatarColor(address),
               child: Text(
-                initial,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18),
+                address.isNotEmpty ? address[0].toUpperCase() : '?',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
             const SizedBox(width: 16),
@@ -505,10 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           address,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.white),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -516,8 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       Text(
                         _formatDate(msg.date),
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade400),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                       ),
                     ],
                   ),
@@ -526,8 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     msg.body ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        TextStyle(color: Colors.grey.shade300, fontSize: 14),
+                    style: TextStyle(color: Colors.grey.shade300, fontSize: 14),
                   ),
                 ],
               ),
@@ -555,10 +479,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
               onPressed: _ensurePermissionAndLoadSms,
               child: const Text('Retry'),
@@ -566,8 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => openAppSettings(),
-              child: const Text('Open Settings',
-                  style: TextStyle(color: Colors.blueAccent)),
+              child: const Text('Open Settings', style: TextStyle(color: Colors.blueAccent)),
             ),
           ],
         ),
@@ -592,8 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Block', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('Block', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -617,20 +537,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Scan Inbox sheet ──────────────────────────────────────────────────────
-
 class _ScanResult {
   final SmsMessage message;
   final bool flagged;
   final double confidence;
-  final List<String> tags;
 
-  const _ScanResult({
-    required this.message,
-    required this.flagged,
-    required this.confidence,
-    required this.tags,
-  });
+  const _ScanResult({required this.message, required this.flagged, required this.confidence});
 }
 
 class _ScanInboxSheet extends StatefulWidget {
@@ -673,7 +585,6 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
     for (final msg in sample) {
       bool flagged = false;
       double confidence = 0.0;
-      List<String> tags = [];
 
       if (isOnline) {
         try {
@@ -685,12 +596,9 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
               )
               .timeout(const Duration(seconds: 8));
           if (response.statusCode == 200) {
-            final data =
-                jsonDecode(response.body) as Map<String, dynamic>;
+            final data = jsonDecode(response.body) as Map<String, dynamic>;
             flagged = data['flagged'] as bool? ?? false;
-            confidence =
-                (data['confidence'] as num?)?.toDouble() ?? 0.0;
-            tags = List<String>.from(data['tags'] as List? ?? []);
+            confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
           } else {
             throw Exception('non-200');
           }
@@ -698,31 +606,18 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
           final r = OfflineClassifier.classify(msg.body ?? '');
           flagged = r['flagged'] as bool;
           confidence = (r['confidence'] as num).toDouble();
-          tags = List<String>.from(r['tags'] as List);
         }
       } else {
         final r = OfflineClassifier.classify(msg.body ?? '');
         flagged = r['flagged'] as bool;
         confidence = (r['confidence'] as num).toDouble();
-        tags = List<String>.from(r['tags'] as List);
       }
 
-      results.add(_ScanResult(
-        message: msg,
-        flagged: flagged,
-        confidence: confidence,
-        tags: tags,
-      ));
-
+      results.add(_ScanResult(message: msg, flagged: flagged, confidence: confidence));
       if (mounted) setState(() => _progress++);
     }
 
-    if (mounted) {
-      setState(() {
-        _results = results;
-        _scanning = false;
-      });
-    }
+    if (mounted) setState(() { _results = results; _scanning = false; });
   }
 
   @override
@@ -738,8 +633,7 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
         children: [
           const SizedBox(height: 12),
           Container(
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade400,
               borderRadius: BorderRadius.circular(2),
@@ -756,8 +650,7 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
                     _scanning
                         ? 'Scanning inbox... ($_progress / $_total)'
                         : 'Scan complete — $suspicious suspicious',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -778,24 +671,23 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
               itemCount: _results.length,
               itemBuilder: (_, i) {
                 final r = _results[i];
-                final addr = r.message.address ?? 'Unknown';
                 final pct = (r.confidence * 100).round();
+                final badgeColor = r.confidence >= 0.85
+                    ? Colors.red
+                    : r.confidence >= 0.5
+                        ? Colors.orange
+                        : Colors.green;
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: r.flagged
-                        ? Colors.redAccent
-                        : Colors.green,
+                    backgroundColor: r.flagged ? Colors.redAccent : Colors.green,
                     child: Icon(
-                      r.flagged
-                          ? Icons.warning_amber_rounded
-                          : Icons.check,
+                      r.flagged ? Icons.warning_amber_rounded : Icons.check,
                       color: Colors.white,
                       size: 18,
                     ),
                   ),
-                  title: Text(addr,
-                      style:
-                          const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(r.message.address ?? 'Unknown',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(
                     (r.message.body ?? '').length > 60
                         ? '${(r.message.body ?? '').substring(0, 60)}...'
@@ -804,33 +696,19 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: r.confidence >= 0.85
-                          ? Colors.red
-                          : r.confidence >= 0.5
-                              ? Colors.orange
-                              : Colors.green,
+                      color: badgeColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '$pct%',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12),
-                    ),
+                    child: Text('$pct%',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            MessageDetailScreen(message: r.message),
-                      ),
-                    );
-                  },
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => MessageDetailScreen(message: r.message)),
+                  ),
                 );
               },
             ),

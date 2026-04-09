@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-/// Singleton that tracks network connectivity and broadcasts changes.
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
   factory ConnectivityService() => _instance;
@@ -12,15 +11,15 @@ class ConnectivityService {
 
   final _connectivity = Connectivity();
   final _controller = StreamController<bool>.broadcast();
-
-  /// Stream of true (online) / false (offline) events.
   Stream<bool> get onStatusChange => _controller.stream;
 
   StreamSubscription<List<ConnectivityResult>>? _subscription;
 
   Future<void> init() async {
     try {
-      final results = await _connectivity.checkConnectivity();
+      final results = await _connectivity
+          .checkConnectivity()
+          .timeout(const Duration(seconds: 4));
       _isOnline = _hasConnection(results);
       _subscription = _connectivity.onConnectivityChanged.listen((results) {
         final online = _hasConnection(results);
@@ -30,15 +29,12 @@ class ConnectivityService {
         }
       });
     } catch (_) {
-      // If connectivity_plus fails, assume online to not block the user.
       _isOnline = true;
     }
   }
 
-  bool _hasConnection(List<ConnectivityResult> results) {
-    return results.isNotEmpty &&
-        !results.every((r) => r == ConnectivityResult.none);
-  }
+  bool _hasConnection(List<ConnectivityResult> results) =>
+      results.isNotEmpty && results.any((r) => r != ConnectivityResult.none);
 
   void dispose() {
     _subscription?.cancel();
