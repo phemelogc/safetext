@@ -11,6 +11,8 @@ import '../config/api.dart';
 import '../services/notification_service.dart';
 import '../services/offline_classifier.dart';
 import '../services/connectivity_service.dart';
+import '../utils/api_utils.dart';
+import '../widgets/offline_banner.dart';
 import 'message_detail_screen.dart';
 import 'settings_screen.dart';
 import 'education_hub_screen.dart';
@@ -93,17 +95,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<SmsMessage> _messages = [];
   bool _permissionDenied = false;
   bool _loading = true;
-  bool _isOnline = true;
-
-  StreamSubscription<bool>? _connectivitySub;
 
   @override
   void initState() {
     super.initState();
-    _isOnline = ConnectivityService().isOnline;
-    _connectivitySub = ConnectivityService().onStatusChange.listen((online) {
-      if (mounted) setState(() => _isOnline = online);
-    });
     _ensurePermissionAndLoadSms();
     _telephony.listenIncomingSms(
       onNewMessage: _handleNewSms,
@@ -114,7 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _connectivitySub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -175,25 +169,17 @@ class _HomeScreenState extends State<HomeScreen> {
     double confidence = 0.0;
     List<String> tags = [];
 
-    try {
-      final response = await http
-          .post(
-            Uri.parse(predictUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'message': msg.body ?? ''}),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
-        tags = List<String>.from(data['tags'] as List? ?? []);
-        try {
-          await FirestoreService().logEvent('message_scanned', 'Foreground scan');
-        } catch (_) {}
-      } else {
-        throw Exception('non-200');
-      }
-    } catch (_) {
+    final response = await safeApiCall(() => http.post(
+          Uri.parse(predictUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'message': msg.body ?? ''}),
+        ));
+    if (response != null && response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
+      tags = List<String>.from(data['tags'] as List? ?? []);
+      unawaited(FirestoreService().logEvent('message_scanned', 'Foreground scan'));
+    } else {
       final result = OfflineClassifier.classify(msg.body ?? '');
       confidence = (result['confidence'] as num).toDouble();
       tags = List<String>.from(result['tags'] as List);
@@ -272,32 +258,8 @@ class _HomeScreenState extends State<HomeScreen> {
         label: const Text('Scan Inbox'),
         backgroundColor: const Color(0xFF2196F3),
       ),
-      body: Column(
-        children: [
-          if (!_isOnline)
-            Material(
-              color: Colors.orange.shade800,
-              child: const SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.wifi_off, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Offline mode — using local keyword filter',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          Expanded(
-            child: NestedScrollView(
+      body: OfflineBanner(
+        child: NestedScrollView(
               headerSliverBuilder: (context, _) => [
                 SliverAppBar(
                   title: Text(
@@ -390,8 +352,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                         ),
             ),
-          ),
-        ],
       ),
     );
   }
@@ -586,28 +546,22 @@ class _ScanInboxSheetState extends State<_ScanInboxSheet> {
       bool flagged = false;
       double confidence = 0.0;
 
-      if (isOnline) {
-        try {
-          final response = await http
-              .post(
+      final response = isOnline
+          ? await safeApiCall(
+              () => http.post(
                 Uri.parse(predictUrl),
                 headers: {'Content-Type': 'application/json'},
                 body: jsonEncode({'message': msg.body ?? ''}),
-              )
-              .timeout(const Duration(seconds: 8));
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body) as Map<String, dynamic>;
-            flagged = data['flagged'] as bool? ?? false;
-            confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
-          } else {
-            throw Exception('non-200');
-          }
-        } catch (_) {
-          final r = OfflineClassifier.classify(msg.body ?? '');
-          flagged = r['flagged'] as bool;
-          confidence = (r['confidence'] as num).toDouble();
-        }
+              ),
+              timeout: const Duration(seconds: 8),
+            )
+          : null;
+      if (response != null && response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        flagged = data['flagged'] as bool? ?? false;
+        confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
       } else {
+        // API unavailable or offline — fall back to local classifier.
         final r = OfflineClassifier.classify(msg.body ?? '');
         flagged = r['flagged'] as bool;
         confidence = (r['confidence'] as num).toDouble();

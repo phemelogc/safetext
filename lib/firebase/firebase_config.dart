@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -15,6 +16,13 @@ class FirebaseConfig {
           appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
         ),
       ).timeout(const Duration(seconds: 6));
+
+      // Enable offline persistence so Firestore reads/writes work without a
+      // network connection. Writes are queued and synced when back online.
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
     } catch (e) {
       debugPrint('Firebase init: $e');
     }

@@ -1,34 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'firebase/firebase_config.dart';
-import 'firebase/firestore_service.dart';
-import 'screens/onboarding_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'services/notification_service.dart';
-import 'services/connectivity_service.dart';
-import 'services/write_queue.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await dotenv.load(fileName: ".env");
-    await FirebaseConfig.init();
-    await FirestoreService().logEvent('app_opened', 'App launched');
-  } catch (e) {
-    debugPrint('Startup error: $e');
-  }
-
-  await NotificationService.init();
-
-  final connectivity = ConnectivityService();
-  await connectivity.init();
-  connectivity.onStatusChange.listen((online) {
-    if (online) WriteQueue().flush();
-  });
-  if (connectivity.isOnline) WriteQueue().flush();
-
+  // dotenv and SharedPreferences are both local — no network, no blocking.
+  await dotenv.load(fileName: ".env");
   final prefs = await SharedPreferences.getInstance();
   final onboarded = prefs.getBool('onboarded') ?? false;
   final isDark = prefs.getBool('isDark') ?? true;
@@ -37,8 +16,10 @@ void main() async {
   SafeTextApp.themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
   SafeTextApp.localeNotifier.value = lang;
 
+  // runApp is called immediately — all heavy async init (Firebase, connectivity,
+  // notifications) happens inside SplashScreen so the UI renders right away.
   runApp(SafeTextApp(
-    initialRoute: onboarded ? const HomeScreen() : const OnboardingScreen(),
+    initialRoute: SplashScreen(onboarded: onboarded),
   ));
 }
 

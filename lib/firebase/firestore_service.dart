@@ -3,6 +3,10 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io' show Platform;
 import '../services/write_queue.dart';
 
+// Every network-bound Firestore operation is guarded by a 10-second timeout so
+// that a slow or absent network connection never blocks the UI indefinitely.
+const _kTimeout = Duration(seconds: 10);
+
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -34,7 +38,7 @@ class FirestoreService {
       'device_id': await _getDeviceId(),
     };
     try {
-      await _db.collection('flagged_messages').add(data);
+      await _db.collection('flagged_messages').add(data).timeout(_kTimeout);
     } catch (_) {
       await WriteQueue().enqueue(collection: 'flagged_messages', data: data);
     }
@@ -45,13 +49,18 @@ class FirestoreService {
       final query = await _db
           .collection('suspicious_numbers')
           .where('phone_number', isEqualTo: phoneNumber)
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(_kTimeout);
 
       if (query.docs.isNotEmpty) {
-        await _db.collection('suspicious_numbers').doc(query.docs.first.id).update({
-          'report_count': FieldValue.increment(1),
-          'last_reported': Timestamp.now(),
-        });
+        await _db
+            .collection('suspicious_numbers')
+            .doc(query.docs.first.id)
+            .update({
+              'report_count': FieldValue.increment(1),
+              'last_reported': Timestamp.now(),
+            })
+            .timeout(_kTimeout);
       } else {
         await _db.collection('suspicious_numbers').add({
           'phone_number': phoneNumber,
@@ -59,7 +68,7 @@ class FirestoreService {
           'last_reported': Timestamp.now(),
           'confirmed_smishing': false,
           'added_by': 'user',
-        });
+        }).timeout(_kTimeout);
       }
     } catch (_) {}
   }
@@ -74,7 +83,8 @@ class FirestoreService {
           .where('phone_number', isEqualTo: phoneNumber)
           .where('confirmed_smishing', isEqualTo: true)
           .limit(1)
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(_kTimeout);
       return query.docs.isNotEmpty ? query.docs.first.data() : null;
     } catch (_) {
       return null;
@@ -97,7 +107,7 @@ class FirestoreService {
       'details': details,
     };
     try {
-      await _db.collection('app_logs').add(data);
+      await _db.collection('app_logs').add(data).timeout(_kTimeout);
     } catch (_) {
       await WriteQueue().enqueue(collection: 'app_logs', data: data);
     }
