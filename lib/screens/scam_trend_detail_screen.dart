@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ScamTrendDetailScreen extends StatelessWidget {
@@ -231,6 +233,18 @@ class ScamTrendDetailScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () => _copyAlert(context, title, desc),
+                      icon: const Icon(Icons.copy_outlined, size: 18),
+                      label: const Text('Copy Text'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -293,20 +307,17 @@ class ScamTrendDetailScreen extends StatelessWidget {
 
   Future<void> _shareAlert(
       BuildContext context, String title, String desc) async {
-    final text = '$title\n\n$desc\n\n— SafeText';
-    final uri = Uri(
-      scheme: 'https',
-      host: 'wa.me',
-      queryParameters: {'text': text},
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return;
-    }
+    final text = '⚠️ Scam Alert: $title\n\n$desc\n\n— Shared via SafeText';
+    await Share.share(text, subject: 'Scam Alert: $title');
+  }
+
+  Future<void> _copyAlert(
+      BuildContext context, String title, String desc) async {
+    final text = '⚠️ Scam Alert: $title\n\n$desc\n\n— Shared via SafeText';
+    await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Copy the text above to share this alert.')),
+        const SnackBar(content: Text('Alert text copied to clipboard.')),
       );
     }
   }

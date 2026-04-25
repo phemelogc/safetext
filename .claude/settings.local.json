@@ -3,7 +3,8 @@
     "allow": [
       "Bash(find .:*)",
       "Bash(flutter analyze *)",
-      "Bash(cmd *)"
+      "Bash(cmd *)",
+      "Bash(flutter pub *)"
     ]
   }
 }
