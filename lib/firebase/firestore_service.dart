@@ -95,7 +95,6 @@ class FirestoreService {
     return _db
         .collection('educational_alerts')
         .where('published', isEqualTo: true)
-        .orderBy('published_at', descending: true)
         .snapshots();
   }
 

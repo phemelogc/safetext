@@ -115,11 +115,7 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
         url: 'https://www.saps.gov.za/services/crimestop.php',
         icon: Icons.local_police,
       ),
-      _ReportOption(
-        label: 'FIC (Financial Crime – SA)',
-        url: 'https://www.fic.gov.za/reporting',
-        icon: Icons.account_balance,
-      ),
+      
       _ReportOption(
         label: 'BTRC (Botswana)',
         url: 'https://www.btrc.bw/',
@@ -245,9 +241,20 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService().getPublishedAlerts(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          debugPrint('Education hub Firestore error: ${snapshot.error}');
+        }
+
         // Fresh live data
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          final liveAlerts = snapshot.data!.docs.map((doc) {
+          final docs = snapshot.data!.docs.toList()
+            ..sort((a, b) {
+              final aTs = (a.data() as Map<String, dynamic>)['published_at'];
+              final bTs = (b.data() as Map<String, dynamic>)['published_at'];
+              if (aTs == null || bTs == null) return 0;
+              return (bTs as Timestamp).compareTo(aTs as Timestamp);
+            });
+          final liveAlerts = docs.map((doc) {
             final d = doc.data() as Map<String, dynamic>;
             return <String, dynamic>{
               'title': d['title']?.toString() ?? 'Alert',
