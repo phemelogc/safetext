@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/translations.dart';
 import '../main.dart';
 import '../firebase/firestore_service.dart';
+import 'scam_trend_detail_screen.dart';
 
 class EducationHubScreen extends StatefulWidget {
   const EducationHubScreen({super.key});
@@ -261,6 +262,11 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
               'desc': d['content']?.toString() ??
                   d['description']?.toString() ?? '',
               'icon': d['icon']?.toString(),
+              'category': d['category']?.toString(),
+              'tips': d['tips'] is List ? List<String>.from(d['tips'] as List) : null,
+              'warning_signs': d['warning_signs'] is List
+                  ? List<String>.from(d['warning_signs'] as List)
+                  : null,
             };
           }).toList();
 
@@ -333,54 +339,73 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
     Map<String, dynamic> topic,
     String lang,
   ) {
+    final primary = Theme.of(context).primaryColor;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor:
-                      Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                  child: Icon(
-                    _iconFor(topic['icon'] as String?),
-                    color: Theme.of(context).primaryColor,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ScamTrendDetailScreen(topic: topic),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: primary.withValues(alpha: 0.15),
+                    child: Icon(
+                      _iconFor(topic['icon'] as String?),
+                      color: primary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    topic['title'] as String,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontSize: 18),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      topic['title'] as String,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontSize: 18),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              topic['desc'] as String,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                Translations.get('read_more', lang),
-                style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                topic['desc'] as String,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    Translations.get('read_more', lang),
+                    style: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      size: 13, color: primary),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
