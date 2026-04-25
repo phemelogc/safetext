@@ -257,10 +257,11 @@ class ScamTrendDetailScreen extends StatelessWidget {
 
   Future<void> _reportScam(BuildContext context) async {
     final options = [
-      _ReportOption('IC3 (USA – Cybercrime)', 'https://www.ic3.gov/', Icons.gavel),
+      _ReportOption('IC3 (USA – Cybercrime)', 'https://www.ic3.gov/complaint', Icons.gavel),
       _ReportOption('SAPS (South Africa)',
           'https://www.saps.gov.za/services/crimestop.php', Icons.local_police),
-      _ReportOption('BTRC (Botswana)', 'https://www.btrc.bw/', Icons.public),
+      _ReportOption('BOCRA (Botswana)',
+          'https://www.bocra.org.bw/report-cyber-related-complaint', Icons.public),
     ];
 
     await showModalBottomSheet(

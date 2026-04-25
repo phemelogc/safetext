@@ -94,21 +94,279 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
     final raw = controller.text.trim();
     if (raw.isEmpty) return;
 
-    // VirusTotal's URL-scan page accepts any URL in the query parameter.
-    final vtUrl = Uri.parse(
-      'https://www.virustotal.com/gui/home/url',
-    );
-    if (await canLaunchUrl(vtUrl)) {
-      await launchUrl(vtUrl, mode: LaunchMode.externalApplication);
+    final analysis = _analyzeLinkSafety(raw);
+
+    if (!mounted) return;
+
+    final Color verdictColor;
+    final IconData verdictIcon;
+    final String verdictLabel;
+    final String verdictSub;
+
+    switch (analysis.verdict) {
+      case 'unsafe':
+        verdictColor = Colors.red.shade700;
+        verdictIcon = Icons.dangerous_outlined;
+        verdictLabel = 'Unsafe';
+        verdictSub = 'This link shows strong signs of being malicious.';
+      case 'suspicious':
+        verdictColor = Colors.orange.shade700;
+        verdictIcon = Icons.warning_amber_rounded;
+        verdictLabel = 'Suspicious';
+        verdictSub = 'Proceed with caution — this link has risk indicators.';
+      default:
+        verdictColor = Colors.green.shade700;
+        verdictIcon = Icons.check_circle_outline;
+        verdictLabel = 'Looks Safe';
+        verdictSub = 'No obvious red flags detected.';
     }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              color: verdictColor.withValues(alpha: 0.1),
+              child: Column(
+                children: [
+                  Icon(verdictIcon, size: 60, color: verdictColor),
+                  const SizedBox(height: 8),
+                  Text(
+                    verdictLabel,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: verdictColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      verdictSub,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: verdictColor.withValues(alpha: 0.8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      raw,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 12),
+                    ),
+                  ),
+                  if (analysis.flags.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Risk factors found:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: verdictColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...analysis.flags.map(
+                      (f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.arrow_right,
+                                size: 18, color: verdictColor),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(f,
+                                  style: const TextStyle(fontSize: 13)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'No suspicious patterns were detected locally. '
+                      'For a deeper scan use VirusTotal below.',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(ctx)
+                              .textTheme
+                              .bodySmall
+                              ?.color),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final vtUrl = Uri.parse(
+                          'https://www.virustotal.com/gui/home/url',
+                        );
+                        if (await canLaunchUrl(vtUrl)) {
+                          await launchUrl(vtUrl,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('Deep Scan on VirusTotal'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static _LinkAnalysis _analyzeLinkSafety(String raw) {
+    final flags = <String>[];
+    final url = raw.startsWith('http') ? raw : 'https://$raw';
+    final uri = Uri.tryParse(url);
+
+    if (uri == null || uri.host.isEmpty) {
+      return const _LinkAnalysis(verdict: 'unsafe', flags: ['Could not parse URL — may be malformed']);
+    }
+
+    final host = uri.host.toLowerCase();
+    final scheme = uri.scheme.toLowerCase();
+    final fullUrl = url.toLowerCase();
+    final domainParts = host.split('.');
+    final domainName = domainParts.length >= 2
+        ? domainParts[domainParts.length - 2]
+        : host;
+
+    // HTTP instead of HTTPS
+    if (scheme == 'http') {
+      flags.add('Not encrypted — uses HTTP instead of HTTPS');
+    }
+
+    // IP address as hostname
+    if (RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(host)) {
+      flags.add('Uses a raw IP address instead of a domain name');
+    }
+
+    // URL shorteners
+    const shorteners = [
+      'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'rb.gy',
+      'cutt.ly', 'tiny.cc', 'is.gd', 'buff.ly', 'adf.ly', 'short.link',
+      'shorte.st', 'bc.vc', 'lnkd.in',
+    ];
+    if (shorteners.any((s) => host == s || host.endsWith('.$s'))) {
+      flags.add('URL shortener — hides the actual destination');
+    }
+
+    // Free/high-abuse TLDs
+    const abusedTlds = ['.tk', '.ml', '.ga', '.cf', '.gq'];
+    if (abusedTlds.any((t) => host.endsWith(t))) {
+      flags.add('Uses a free domain extension commonly abused by scammers');
+    }
+
+    // Unusual TLDs
+    const unusualTlds = [
+      '.xyz', '.top', '.click', '.link', '.online', '.site',
+      '.website', '.buzz', '.loan', '.work', '.party', '.win',
+    ];
+    if (unusualTlds.any((t) => host.endsWith(t))) {
+      flags.add('Uncommon domain extension often used in phishing');
+    }
+
+    // Excessive hyphens in domain label
+    if (domainName.split('-').length > 2) {
+      flags.add('Multiple hyphens in domain — common phishing pattern');
+    }
+
+    // Suspicious path/query keywords
+    const suspiciousWords = [
+      'login', 'verify', 'account', 'password', 'secure', 'update',
+      'confirm', 'signin', 'unlock', 'suspended', 'reset', 'banking',
+      'credential', 'wallet', 'paypal', 'invoice', 'refund',
+    ];
+    final hits = suspiciousWords.where((w) => fullUrl.contains(w)).toList();
+    if (hits.isNotEmpty) {
+      flags.add('Suspicious keywords in URL: ${hits.take(3).join(', ')}');
+    }
+
+    // Excessive subdomains
+    if (domainParts.length > 4) {
+      flags.add('Too many subdomains — can mimic a trusted site');
+    }
+
+    // Lookalike digits in domain (e.g. paypa1, g00gle)
+    if (RegExp(r'[0-9]').hasMatch(domainName)) {
+      flags.add('Digits in domain name — may be impersonating a real brand');
+    }
+
+    // Very long URL
+    if (raw.length > 120) {
+      flags.add('Unusually long URL — common in redirect/phishing chains');
+    }
+
+    // Verdict
+    final bool critical = flags.any((f) =>
+        f.contains('IP address') ||
+        f.contains('URL shortener') ||
+        f.contains('free domain'));
+    final String verdict;
+    if (flags.length >= 3 || (critical && flags.length >= 2)) {
+      verdict = 'unsafe';
+    } else if (flags.isNotEmpty) {
+      verdict = 'suspicious';
+    } else {
+      verdict = 'safe';
+    }
+
+    return _LinkAnalysis(verdict: verdict, flags: flags);
   }
 
   Future<void> _reportToAuthorities() async {
-    final lang = SafeTextApp.localeNotifier.value;
     final options = [
       _ReportOption(
         label: 'IC3 (USA – Cybercrime)',
-        url: 'https://www.ic3.gov/',
+        url: 'https://www.ic3.gov/complaint',
         icon: Icons.gavel,
       ),
       _ReportOption(
@@ -116,10 +374,9 @@ class _EducationHubScreenState extends State<EducationHubScreen> {
         url: 'https://www.saps.gov.za/services/crimestop.php',
         icon: Icons.local_police,
       ),
-      
       _ReportOption(
-        label: 'BTRC (Botswana)',
-        url: 'https://www.btrc.bw/',
+        label: 'BOCRA (Botswana)',
+        url: 'https://www.bocra.org.bw/report-cyber-related-complaint',
         icon: Icons.public,
       ),
     ];
@@ -508,4 +765,10 @@ class _ReportOption {
     required this.url,
     required this.icon,
   });
+}
+
+class _LinkAnalysis {
+  final String verdict; // 'safe' | 'suspicious' | 'unsafe'
+  final List<String> flags;
+  const _LinkAnalysis({required this.verdict, required this.flags});
 }
