@@ -4,7 +4,8 @@
       "Bash(find .:*)",
       "Bash(flutter analyze *)",
       "Bash(cmd *)",
-      "Bash(flutter pub *)"
+      "Bash(flutter pub *)",
+      "Bash(cygpath -w /tmp/safetext_core.txt)"
     ]
   }
 }

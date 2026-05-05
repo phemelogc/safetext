@@ -79,11 +79,6 @@ def has_phishing_link(message: str) -> bool:
  
     return bool(_SHORTENERS.search(message) or _SUSPICIOUS_PATTERNS.search(message))
 
-def has_phishing_link(message: str) -> bool:
-    """Return True if the message contains shortened URLs or suspicious domain patterns."""
-    if not message:
-        return False
-    return bool(_SHORTENERS.search(message) or _SUSPICIOUS_PATTERNS.search(message))
 
 
 # ---------------------------------------------------------------------------
