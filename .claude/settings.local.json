@@ -5,7 +5,8 @@
       "Bash(flutter analyze *)",
       "Bash(cmd *)",
       "Bash(flutter pub *)",
-      "Bash(cygpath -w /tmp/safetext_core.txt)"
+      "mcp__claude_ai_Canva__generate-design",
+      "mcp__claude_ai_Canva__create-design-from-candidate"
     ]
   }
 }

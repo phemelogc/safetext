@@ -25,9 +25,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _init() async {
     try {
-      // Run independent initializations in parallel to minimise startup latency.
-      // Firebase, connectivity, and notifications do not depend on each other.
+      // Hold splash for at least 4 s while running init in parallel.
       await Future.wait([
+        Future.delayed(const Duration(seconds: 4)),
         FirebaseConfig.init(),          // SDK local init + optional 6 s timeout
         ConnectivityService().init(),   // connectivity_plus with 4 s timeout
         NotificationService.init(),     // local notification channel setup
