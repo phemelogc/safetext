@@ -27,7 +27,7 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       // Hold splash for at least 4 s while running init in parallel.
       await Future.wait([
-        Future.delayed(const Duration(seconds: 4)),
+        Future.delayed(const Duration(seconds: 2)),
         FirebaseConfig.init(),          // SDK local init + optional 6 s timeout
         ConnectivityService().init(),   // connectivity_plus with 4 s timeout
         NotificationService.init(),     // local notification channel setup

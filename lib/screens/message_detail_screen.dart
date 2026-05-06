@@ -22,7 +22,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     with SingleTickerProviderStateMixin {
   String _prediction = '';
   bool _isLoading = true;
-  double? _confidence;
+  
   bool _flagged = false;
   List<String> _tags = [];
   String _loadingMessage = '';
@@ -149,7 +149,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
     if (mounted) {
       setState(() {
         _flagged = flagged;
-        _confidence = confidence;
+       
         _tags = tags;
         _prediction = explanation;
         _isOffline = usedOffline;
@@ -374,16 +374,23 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
   }
 
   Widget _buildResultCard(ThemeData theme, String lang) {
-    final pct = _confidence != null ? (_confidence! * 100).round() : 0;
-    final barColor = pct >= 85 ? Colors.redAccent : pct >= 50 ? Colors.orange : Colors.green;
+    final statusLabel = _flagged ? 'Suspicious Message' : 'Message Looks Safe';
+    final statusColor = _flagged ? Colors.redAccent : Colors.green;
+    final statusIcon = _flagged
+        ? Icons.warning_amber_rounded
+        : Icons.check_circle_outline;
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _flagged ? Colors.red.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+        color: _flagged
+            ? Colors.red.withValues(alpha: 0.1)
+            : Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: _flagged ? Colors.redAccent.withValues(alpha: 0.5) : Colors.green.withValues(alpha: 0.5),
+          color: _flagged
+              ? Colors.redAccent.withValues(alpha: 0.5)
+              : Colors.green.withValues(alpha: 0.5),
           width: 2,
         ),
       ),
@@ -392,38 +399,28 @@ class _MessageDetailScreenState extends State<MessageDetailScreen>
         children: [
           Row(
             children: [
-              Icon(
-                _flagged ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                color: _flagged ? Colors.redAccent : Colors.green,
-                size: 28,
-              ),
+              Icon(statusIcon, color: statusColor, size: 28),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${Translations.get('suspicion', lang)}: $pct%',
+                  statusLabel,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: _flagged ? Colors.redAccent : Colors.green,
+                    color: statusColor,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: _confidence ?? 0.0,
-              minHeight: 10,
-              backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(barColor),
-            ),
-          ),
           const SizedBox(height: 16),
           Text(
             _prediction,
-            style: TextStyle(fontSize: 15, color: theme.textTheme.bodyMedium?.color, height: 1.4),
+            style: TextStyle(
+              fontSize: 15,
+              color: theme.textTheme.bodyMedium?.color,
+              height: 1.4,
+            ),
           ),
           if (_tags.isNotEmpty) ...[
             const SizedBox(height: 16),
